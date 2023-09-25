@@ -1,5 +1,8 @@
 import discord
 import responses
+import sys
+
+
 
 async def send_message(message, user_message, is_private):
     try:
@@ -11,6 +14,14 @@ async def send_message(message, user_message, is_private):
     except Exception as e:
         print(e)
 
+def create_commands(command_tree):
+    @command_tree.command(name="hithere", 
+                          description="Testing slash command")
+    async def test_slash_command(interaction: discord.Interaction):
+        print("{} used a slash command!".format(interaction.user))
+        await interaction.response.send_message("Secret message", ephemeral=True)
+        
+
 def run_bot():
     token_file = open("bot_token.txt", "r")
     TOKEN = token_file.read()
@@ -19,6 +30,9 @@ def run_bot():
     intents = discord.Intents.default()
     intents.message_content = True
     client = discord.Client(intents=intents)
+
+    command_tree = discord.app_commands.CommandTree(client)
+    create_commands(command_tree)
 
     @client.event
     async def on_ready():
