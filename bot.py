@@ -1,20 +1,20 @@
 import discord
 import responses
 
-async def send_message(message, userMessage, isPrivate):
+async def send_message(message, user_message, is_private):
     try:
-        response = responses.handle_responses(userMessage)
-        if isPrivate:
+        response = responses.handle_responses(user_message)
+        if is_private:
             await message.author.send(response)
         else:
             await message.channel.send(response)
     except Exception as e:
         print(e)
 
-def runBot():
-    tokenFile = open("bot_token.txt", "r")
-    TOKEN = tokenFile.read()
-    tokenFile.close()
+def run_bot():
+    token_file = open("bot_token.txt", "r")
+    TOKEN = token_file.read()
+    token_file.close()
 
     intents = discord.Intents.default()
     intents.message_content = True
@@ -29,15 +29,15 @@ def runBot():
         if message.author == client.user: #Prevents bot from responding to its own messages
             return
         username = str(message.author)
-        userMessage = str(message.content)
+        user_message = str(message.content)
         channel = str(message.channel)
-        print("{0} said {1} in {2}".format(username, userMessage, channel))
+        print("{0} said {1} in {2}".format(username, user_message, channel))
 
-        if userMessage[0] == '?':
-            userMessage = userMessage[1:] #Removes the '?' message start
-            await send_message(message, userMessage, isPrivate=True)
+        if user_message[0] == '?':
+            user_message = user_message[1:] #Removes the '?' message start
+            await send_message(message, user_message, is_private=True)
         else:
-            userMessage = userMessage[1:] #Removes the '!' message start
-            await send_message(message, userMessage, isPrivate=False)
+            user_message = user_message[1:] #Removes the '!' message start
+            await send_message(message, user_message, is_private=False)
 
     client.run(TOKEN)
