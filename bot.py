@@ -2,6 +2,10 @@ import discord
 import responses
 from discord.ext import commands
 import sys
+global GUILD_ID
+id_file = open("guild_id.txt", "r")
+GUILD_ID = int(id_file.read())
+id_file.close()
 
 class BlackjackButtons(discord.ui.View):
     def __init__(self, label: str):
@@ -32,7 +36,7 @@ def create_commands(command_tree):
         await interaction.response.send_message("Secret message", ephemeral=True)
 
     @command_tree.command(name = "blackjack", 
-                          description = "Start a new game of Blackjack")
+                          description = "Start a new game of Blackjack", guild=discord.Object(id=GUILD_ID))
     async def start_blackjack(interaction: discord.Interaction):
         print("Someone started a game of Blackjack")
         await interaction.response.send_message("Blackjack stuff", ephemeral=True)
@@ -41,6 +45,7 @@ def run_bot():
     token_file = open("bot_token.txt", "r")
     TOKEN = token_file.read()
     token_file.close()
+
 
     intents = discord.Intents.default()
     intents.message_content = True
@@ -51,7 +56,7 @@ def run_bot():
 
     @client.event
     async def on_ready():
-        await command_tree.sync(guild=discord.Object(id=1145838519466606594))
+        await command_tree.sync(guild=discord.Object(id=GUILD_ID))
         print("{} is now running".format(client.user))
 
     @client.event
