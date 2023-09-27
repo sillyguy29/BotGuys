@@ -2,16 +2,17 @@ import discord
 import responses
 from discord.ext import commands
 import sys
+
 global GUILD_ID
 id_file = open("guild_id.txt", "r")
 GUILD_ID = int(id_file.read())
 id_file.close()
 
 class BlackjackButtons(discord.ui.View):
-    def __init__(self, label: str):
-        super.__init__()
-        self.label = label
-        self.add_item(discord.ui.Button(label = self.label))
+    def __init__(self):
+        super().__init__()
+        #self.label = label
+        #self.add_item(discord.ui.Button(label = self.label))
 
     @discord.ui.button(label = "Hit Me!", style = discord.ButtonStyle.green)
     async def hit_me(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -39,7 +40,8 @@ def create_commands(command_tree):
                           description = "Start a new game of Blackjack", guild=discord.Object(id=GUILD_ID))
     async def start_blackjack(interaction: discord.Interaction):
         print("Someone started a game of Blackjack")
-        await interaction.response.send_message("Blackjack stuff", ephemeral=True)
+        view = BlackjackButtons()
+        await interaction.response.send_message("Blackjack stuff", view=view, ephemeral=True)
 
 def run_bot():
     token_file = open("bot_token.txt", "r")
