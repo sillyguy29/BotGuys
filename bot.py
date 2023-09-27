@@ -1,42 +1,50 @@
 import discord
 import responses
 import sys
+import cmd_control
+import logging
+import config
 
 
+# Inherit the discord client class so we can override some methods
+class LanternClient(discord.Client):
+    def __init__(self, *, intents: discord.Intents):
+        super().__init__(intents=intents)
+        self.tree = discord.app_commands.CommandTree(self)
 
-async def send_message(message, user_message, is_private):
-    try:
-        response = responses.handle_responses(user_message)
-        if is_private:
-            await message.author.send(response)
-        else:
-            await message.channel.send(response)
-    except Exception as e:
-        print(e)
+    async def setup_hook(self):
+        await cmd_control.command_control(self.tree)
 
-def create_commands(command_tree):
-    @command_tree.command(name="hithere", 
-                          description="Testing slash command")
-    async def test_slash_command(interaction: discord.Interaction):
-        print("{} used a slash command!".format(interaction.user))
-        await interaction.response.send_message("Secret message", ephemeral=True)
-        
 
+#TODO: Refactor this function and remove unnecessary code
 def run_bot():
-    token_file = open("bot_token.txt", "r")
-    TOKEN = token_file.read()
-    token_file.close()
-
     intents = discord.Intents.default()
     intents.message_content = True
-    client = discord.Client(intents=intents)
+    client = LanternClient(intents=intents)
 
-    command_tree = discord.app_commands.CommandTree(client)
-    create_commands(command_tree)
 
     @client.event
     async def on_ready():
         print("{} is now running".format(client.user))
+
+
+    async def send_message(message, user_message, is_private):
+        try:
+            response = responses.handle_responses(user_message)
+            if is_private:
+                await message.author.send(response)
+            else:
+                await message.channel.send(response)
+        except Exception as e:
+            print(e)
+            
+
+    @client.tree.command(name="hithere", 
+                            description="Testing slash command")
+    async def test_slash_command(interaction: discord.Interaction):
+        print("{} used a slash command!".format(interaction.user))
+        await interaction.response.send_message("Secret message", ephemeral=True)
+
 
     @client.event
     async def on_message(message):
@@ -54,4 +62,8 @@ def run_bot():
             user_message = user_message[1:] #Removes the '!' message start
             await send_message(message, user_message, is_private=False)
 
-    client.run(TOKEN)
+
+    discord.utils.setup_logging(level=logging.INFO)
+
+
+    client.run(config.TOKEN)
