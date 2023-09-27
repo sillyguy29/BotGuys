@@ -1,7 +1,17 @@
 import discord
 import responses
+from discord.ext import commands
 import sys
 
+class BlackjackButtons(discord.ui.View):
+    def __init__(self, label: str):
+        super.__init__()
+        self.label = label
+        self.add_item(discord.ui.Button(label = self.label))
+
+    @discord.ui.button(label = "Hit Me!", style = discord.ButtonStyle.green)
+    async def hit_me(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("You've been hit by", ephemeral = True)
 
 
 async def send_message(message, user_message, is_private):
@@ -20,7 +30,12 @@ def create_commands(command_tree):
     async def test_slash_command(interaction: discord.Interaction):
         print("{} used a slash command!".format(interaction.user))
         await interaction.response.send_message("Secret message", ephemeral=True)
-        
+
+    @command_tree.command(name = "blackjack", 
+                          description = "Start a new game of Blackjack")
+    async def start_blackjack(interaction: discord.Interaction):
+        print("Someone started a game of Blackjack")
+        await interaction.response.send_message("Blackjack stuff", ephemeral=True)
 
 def run_bot():
     token_file = open("bot_token.txt", "r")
@@ -36,6 +51,7 @@ def run_bot():
 
     @client.event
     async def on_ready():
+        await command_tree.sync(guild=discord.Object(id=1145838519466606594))
         print("{} is now running".format(client.user))
 
     @client.event
