@@ -16,35 +16,57 @@ class LanternClient(discord.Client):
         await cmd_control.command_control(self.tree)
 
 
-#TODO: Refactor this function and remove unnecessary code
-def run_bot():
-    intents = discord.Intents.default()
-    intents.message_content = True
-    client = LanternClient(intents=intents)
+class BlackjackButtons(discord.ui.View):
+    def __init__(self):
+        super().__init__()
+        #self.label = label
+        #self.add_item(discord.ui.Button(label = self.label))
+
+    @discord.ui.button(label = "Hit Me!", style = discord.ButtonStyle.green)
+    async def hit_me(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("You've been hit by", ephemeral = True)
 
 
-    @client.event
-    async def on_ready():
-        print("{} is now running".format(client.user))
-
-
-    async def send_message(message, user_message, is_private):
-        try:
-            response = responses.handle_responses(user_message)
-            if is_private:
-                await message.author.send(response)
-            else:
-                await message.channel.send(response)
-        except Exception as e:
-            print(e)
+async def send_message(message, user_message, is_private):
+    try:
+        response = responses.handle_responses(user_message)
+        if is_private:
+            await message.author.send(response)
+        else:
+            await message.channel.send(response)
+    except Exception as e:
+        print(e)
             
-
+def create_commands(client):
     @client.tree.command(name="hithere", 
                             description="Testing slash command")
     async def test_slash_command(interaction: discord.Interaction):
         print("{} used a slash command!".format(interaction.user))
         await interaction.response.send_message("Secret message", ephemeral=True)
 
+    @client.tree.command(name = "blackjack", 
+                          description = "Start a new game of Blackjack", 
+                          guild=discord.Object(id=config.GUILD_ID))
+    async def start_blackjack(interaction: discord.Interaction):
+        print("Someone started a game of Blackjack")
+        view = BlackjackButtons()
+        await interaction.response.send_message("Blackjack stuff", view=view, ephemeral=True)
+
+
+#TODO: Refactor this function and remove unnecessary code
+def run_bot():
+    intents = discord.Intents.default()
+    intents.message_content = True
+    client = LanternClient(intents=intents)
+    create_commands(client)
+
+    @client.event
+    async def on_ready():
+        print("{} is now running".format(client.user))
+
+    @client.event
+    async def on_ready():
+        print("{} is now running".format(client.user))
 
     @client.event
     async def on_message(message):
