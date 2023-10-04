@@ -5,6 +5,7 @@ import cmd_control
 import logging
 import config
 
+counter = 0
 
 # Inherit the discord client class so we can override some methods
 class LanternClient(discord.Client):
@@ -24,7 +25,9 @@ class BlackjackButtons(discord.ui.View):
 
     @discord.ui.button(label = "Hit Me!", style = discord.ButtonStyle.green)
     async def hit_me(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("You've been hit by", ephemeral = True)
+        global counter
+        counter += 1
+        await interaction.response.send_message("You've been hit by: {}".format(counter), ephemeral = True)
 
 
 async def send_message(message, user_message, is_private):
@@ -55,6 +58,8 @@ def create_commands(client):
 
 #TODO: Refactor this function and remove unnecessary code
 def run_bot():
+    global counter
+    counter = 0
     intents = discord.Intents.default()
     intents.message_content = True
     client = LanternClient(intents=intents)
