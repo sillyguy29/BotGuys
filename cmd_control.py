@@ -31,9 +31,17 @@ async def local_commands(command_tree):
     response = input("\nShow global commands? y/N ")
     print("\nFetching local application commands...")
     if response == 'y' or response == 'Y':
+        # Global commands
         commands = command_tree.get_commands()
     else:
-        commands = command_tree.get_commands(guild=discord.Object(config.GUILD_ID))
+        # Local commands
+        response = input("\nWhich guild ID? (Enter nothing to use default): ")
+        if not response.isdigit():
+            # Default guild ID
+            commands = await command_tree.get_commands(guild=discord.Object(config.GUILD_ID))
+        else:
+            # Custom guild ID
+            commands = await command_tree.get_commands(guild=discord.Object(int(response)))
 
     print("\nLocal application commands:")
     n = 0
@@ -86,9 +94,17 @@ async def synced_commands(command_tree):
     response = input("\nFetch global commands? y/N ")
     print("\nFetching existing application commands...")
     if response == 'y' or response == 'Y':
+        # Global commands
         commands = await command_tree.fetch_commands()
     else:
-        commands = await command_tree.fetch_commands(guild=discord.Object(config.GUILD_ID))
+        # Local commands
+        response = input("\nWhich guild ID? (Enter nothing to use default): ")
+        if not response.isdigit():
+            # Default guild ID
+            commands = await command_tree.fetch_commands(guild=discord.Object(config.GUILD_ID))
+        else:
+            # Custom guild ID
+            commands = await command_tree.fetch_commands(guild=discord.Object(int(response)))
 
     print("\nExisting application commands:")
     n = 0
@@ -141,11 +157,20 @@ async def command_control(command_tree):
             if inner_response == 'n' or inner_response == 'N':
                 print("Aborted.")
                 continue
+
             if local_guild:
-                await command_tree.sync(guild=discord.Object(config.GUILD_ID))
+                # Sync to local guild
+                response = input("\nWhich guild ID? (Enter nothing to use default): ")
+                if not response.isdigit():
+                    # Default
+                    await command_tree.sync(guild=discord.Object(config.GUILD_ID))
+                else:
+                    await command_tree.sync(guild=discord.Object(int(response)))
+
             else:
+                # Sync globally
                 await command_tree.sync()
-            return
+            continue
         
         elif response == 'r' or response == 'R':
             return
