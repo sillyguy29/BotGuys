@@ -3,7 +3,11 @@ import config
 
 
 async def local_commands(command_tree):
-    # pretty print parsers used below
+    """
+    Show details for commands loaded from local code. These commands are of type
+    discord.app_commands.Command. 
+    """
+    # Pretty print functions used below
     def get_params_str(params):
         r_string = ""
         for i in params:
@@ -61,7 +65,11 @@ async def local_commands(command_tree):
 
 
 async def synced_commands(command_tree):
-    # pretty print parser used below
+    """
+    Show details for commands loaded from local code. These commands are of type
+    discord.app_commands.AppCommand. 
+    """
+    # pretty print function used below
     def parse_AppCommand(command):
         details = ("Detailed info for command [{}]: \n".format(command.name)
         + "Desc: {}\n".format(command.description)
