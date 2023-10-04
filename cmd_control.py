@@ -152,7 +152,7 @@ async def command_control(command_tree):
             if inner_response == 'y' or inner_response == 'Y':
                 local_guild = False
 
-            inner_response = input("\nThis will overwrite existing commands and start the bot."
+            inner_response = input("\nThis will overwrite existing commands."
                                    + " Are you sure? Y/n: ")
             if inner_response == 'n' or inner_response == 'N':
                 print("Aborted.")
