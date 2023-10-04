@@ -48,8 +48,7 @@ def create_commands(client):
         await interaction.response.send_message("Secret message", ephemeral=True)
 
     @client.tree.command(name = "blackjack", 
-                          description = "Start a new game of Blackjack", 
-                          guild=discord.Object(id=config.GUILD_ID))
+                          description = "Start a new game of Blackjack")
     async def start_blackjack(interaction: discord.Interaction):
         print("Someone started a game of Blackjack")
         view = BlackjackButtons()
