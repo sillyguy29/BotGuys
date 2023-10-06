@@ -20,14 +20,22 @@ class LanternClient(discord.Client):
 class BlackjackButtons(discord.ui.View):
     def __init__(self):
         super().__init__()
-        #self.label = label
-        #self.add_item(discord.ui.Button(label = self.label))
 
-    @discord.ui.button(label = "Hit Me!", style = discord.ButtonStyle.green)
+    @discord.ui.button(label = "Hit Me!", style = discord.ButtonStyle.green, custom_id="hit me")
     async def hit_me(self, interaction: discord.Interaction, button: discord.ui.Button):
         global counter
         counter += 1
         await interaction.response.send_message("You've been hit by: {}".format(counter), ephemeral = True)
+    
+    @discord.ui.button(label = "Pass!", style = discord.ButtonStyle.red)
+    async def pass_turn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Gets the custom_id of the "Hit Me!" button and disables it when this button is clicked
+        hitme_button = [x for x in self.children if x.custom_id=="hit me"][0]
+        hitme_button.disabled = True
+        # Changes the text on "Pass!" button to "Passed!" and disables the button
+        button.label = "Passed!"
+        button.disabled = True
+        await interaction.response.edit_message(view=self)
 
 
 async def send_message(message, user_message, is_private):
