@@ -10,38 +10,21 @@ class CounterGame(BaseGame):
 
 
 # TODO: Handle cases where a user closes a game and another user attempts
-# to interact with the closed game
+# to interact with the closed game, might cause issues
 class CounterManager(GameManager):
     def __init__(self, factory, channel_id):
-        self.game = CounterGame()
-        self.base_gui = CounterButtonsBase(self)
-        self.factory = factory
-        self.channel_id = channel_id
+        super().__init__(CounterGame(), CounterButtonsBase(self), channel_id, factory, None)
 
-    async def start_game(self, interaction):
-        await interaction.response.send_message("Counter: 0", view=self.base_gui)
-
-    async def refresh_resend(self, interaction):
-        self.base_gui.clear_items()
-        self.base_gui = CounterButtonsBase(self)
-        await interaction.response.send_message("Counter: {}".format(self.game.count),
-                                                 view=self.base_gui)
-        
-    async def quit_game(self):
-        self.base_gui.clear_items()
-        self.base_gui.stop()
-        self.factory.stop_game(self)
-
-    def get_count(self, interaction):
-        return self.game.count
+    def get_base_menu_string(self):
+        return "Counter: {}".format(self.game.count)
     
-    def increment(self, interaction):
+    async def increment(self):
         self.game.count += 1
-        self.refresh_resend(interaction)
+        await self.resend()
 
-    def decrement(self, interaction):
+    async def decrement(self):
         self.game.count -= 1
-        self.refresh_resend(interaction)
+        await self.resend()
 
 
 class HitOrMiss(discord.ui.View):
@@ -51,12 +34,12 @@ class HitOrMiss(discord.ui.View):
 
     @discord.ui.button(label = "Hit Me!", style = discord.ButtonStyle.green)
     async def hit_me(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.manager.increment(interaction)
+        await self.manager.increment()
         await interaction.response.send_message("You've hit it!", ephemeral = True)
 
     @discord.ui.button(label = "Miss Me!", style = discord.ButtonStyle.green)
     async def miss_me(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.manager.decrement(interaction)
+        await self.manager.decrement()
         await interaction.response.send_message("You've missed it!", ephemeral = True)
     
 
@@ -71,8 +54,9 @@ class CounterButtonsBase(discord.ui.View):
         await interaction.response.send_message("Hit or Miss?", view = view, ephemeral = True)
 
     @discord.ui.button(label = "Refresh", style = discord.ButtonStyle.blurple)
-    async def un_hit_me(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.manager.refresh_resend(interaction)
+    async def ref(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.manager.refresh()
+        await interaction.response.send_message("Refreshing the counter...", ephemeral = True)
 
     @discord.ui.button(label = "Quit", style = discord.ButtonStyle.red)
     async def quit(self, interaction: discord.Interaction, button: discord.ui.Button):

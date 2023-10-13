@@ -69,7 +69,7 @@ def run_bot():
             await send_message(message, user_message, is_private=False)
 
 
-    discord.utils.setup_logging(level=logging.INFO)
+    #discord.utils.setup_logging(level=logging.INFO)
 
 
     client.run(config.TOKEN)
