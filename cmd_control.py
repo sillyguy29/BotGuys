@@ -1,5 +1,5 @@
 import discord
-import config
+import configs.config as config
 
 def print_commands(commands):
     n = 0
