@@ -45,7 +45,8 @@ class GameManager():
 
 
 # General game factory class, handles interactions between the client and the game presenters,
-# manages all active games
+# manages all active games. This class should not use any mutator methods in the manager classes
+# except for create_game.
 class GameFactory():
     def __init__(self):
         self.active_games = dict()
