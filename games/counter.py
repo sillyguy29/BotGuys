@@ -34,11 +34,13 @@ class HitOrMiss(discord.ui.View):
 
     @discord.ui.button(label = "Hit Me!", style = discord.ButtonStyle.green)
     async def hit_me(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.stop()
         await self.manager.increment()
         await interaction.response.send_message("You've hit it!", ephemeral = True)
 
     @discord.ui.button(label = "Miss Me!", style = discord.ButtonStyle.green)
     async def miss_me(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.stop()
         await self.manager.decrement()
         await interaction.response.send_message("You've missed it!", ephemeral = True)
     
@@ -52,6 +54,8 @@ class CounterButtonsBase(discord.ui.View):
     async def hit_miss(self, interaction: discord.Interaction, button: discord.ui.Button):
         view = HitOrMiss(self.manager)
         await interaction.response.send_message("Hit or Miss?", view = view, ephemeral = True)
+        await view.wait()
+        await interaction.delete_original_response()
 
     @discord.ui.button(label = "Refresh", style = discord.ButtonStyle.blurple)
     async def ref(self, interaction: discord.Interaction, button: discord.ui.Button):
