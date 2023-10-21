@@ -1,14 +1,25 @@
+"""Terminal menu for managing slash commands
+
+Contains all the logic needed to sync slash commands.
+"""
 import discord
 import configs.config as config
 
 def print_commands(commands):
+    """
+    Quick loop that prints all commands in a list.
+    """
     n = 0
     for i in commands:
-        print("[{2}] Name: {0} Desc: {1}".format(i.name, i.description, n))
+        print(f"[{n}] Name: {i.name} Desc: {i.description}")
         n += 1
 
 
 def restore_commands(command_tree, commands):
+    """
+    Clears the commands in the command tree and replaces it with the
+    list of commands provided.
+    """
     # need to ensure no conflicts
     command_tree.clear_commands(guild=None)
     for i in commands:
@@ -20,27 +31,32 @@ async def local_commands(command_tree):
     Show details for commands loaded from local code. These commands are of type
     discord.app_commands.Command. 
     """
-    # Pretty print functions used below
     def get_params_str(params):
+        """
+        Take a parameter and turn it into a string
+        """
         r_string = ""
         for i in params:
             r_string = "\t" + i.name + "\n"
         return r_string
-    
-    def parse_Command(command):
-        details = ("Detailed info for command [{}]: \n".format(command.name)
-        + "Desc: {}\n".format(command.description)
-        + "Guild Only: {}\n".format(command.guild_only)
-        + "Parent: {}\n".format(command.parent)
+
+    def parse_command(command):
+        """
+        Pretty print a Discord.Command
+        """
+        details = (f"Detailed info for command [{command.name}]: \n"
+        + f"Desc: {command.description}\n"
+        + f"Guild Only: {command.guild_only}\n"
+        + f"Parent: {command.parent}\n"
         + "Usage Permissions Requirement Integer: ")
         if command.default_permissions is None:
             details = details + "None (Likely Default)\n"
         else:
             details = details + str(command.value) + "\n"
-        details = details + ("Parameters:\n{}".format(get_params_str(command.parameters))
-        + "Extra Data: {}".format(command.extras))
+        details = details + (f"Parameters:\n{get_params_str(command.parameters)}"
+        + f"Extra Data: {command.extras}")
         return details
-    
+
 
     print("\nFetching local application commands...")
     commands = command_tree.get_commands()
@@ -48,19 +64,19 @@ async def local_commands(command_tree):
     print_commands(commands)
 
     while True:
-        response = input("\nEnter a number to view detailed info and/or remove the command, " 
+        response = input("\nEnter a number to view detailed info and/or remove the command, "
                          + "'x' to remove all commands, 'p' to re-print, and 'q' to go back: ")
 
-        if response == 'q' or response == 'Q':
+        if response in {'q', 'Q'}:
             return
-        
-        elif response == 'p' or response == 'P':
+
+        if response in {'p', 'P'}:
             print("\nFetching local application commands...")
             commands = command_tree.get_commands()
             print("\nLocal commands, loaded from the code on your machine:")
             print_commands(commands)
 
-        elif response == 'x' or response == 'X':
+        elif response in {'x', 'X'}:
             print("\nClearing the local command tree...")
             command_tree.clear_commands(guild=None)
             print("\nCommand tree cleared.")
@@ -72,20 +88,20 @@ async def local_commands(command_tree):
                 print("\nInvalid command nummber.")
                 continue
             command = commands[response]
-            print(parse_Command(command))
+            print(parse_command(command))
 
             response = input("\nRemove command? y/N: ")
-            if response == "y" or response == "Y":
+            if response in {'y', 'Y'}:
                 command_tree.remove_command(command.name)
                 print("\nCommand removed.")
                 print("\nFetching local application commands...")
                 commands = command_tree.get_commands()
                 print("\nLocal commands, loaded from the code on your machine:")
                 print_commands(commands)
-        
+
         else:
             print("Unrecognized command.")
-        
+
 
 
 async def synced_commands(command_tree):
@@ -93,23 +109,24 @@ async def synced_commands(command_tree):
     Show details for commands loaded from local code. These commands are of type
     discord.app_commands.AppCommand. 
     """
-    # pretty print function used below
-    def parse_AppCommand(command):
-        details = ("Detailed info for command [{}]: \n".format(command.name)
-        + "Desc: {}\n".format(command.description)
-        + "Command ID: {}\n".format(command.id)
-        + "Guild ID: {}\n".format(command.guild_id)
-        + "Application ID: {}\n".format(command.application_id)
-        + "DM Permission: {}\n".format(command.dm_permission)
+    def parse_app_command(command):
+        """
+        Pretty print a Discord.AppCommand
+        """
+        details = (f"Detailed info for command [{command.name}]: \n"
+        + f"Desc: {command.description}\n"
+        + f"Command ID: {command.id}\n"
+        + f"Guild ID: {command.guild_id}\n"
+        + f"Application ID: {command.application_id}\n"
+        + f"DM Permission: {command.dm_permission}\n"
         + "Usage Permissions Requirement Integer: ")
         if command.default_member_permissions is None:
             return details + "None (Likely Default)"
-        else:
-            return details + str(command.value)
-        
+        return details + str(command.value)
+
 
     response = input("\nFetch global commands? y/N: ")
-    if response == 'y' or response == 'Y':
+    if response in {'y', 'Y'}:
         # Global commands
         print("\nFetching existing global application commands...")
         commands = await command_tree.fetch_commands()
@@ -128,22 +145,22 @@ async def synced_commands(command_tree):
     print_commands(commands)
 
     while True:
-        response = input("\nEnter a number to view detailed info about the command, " 
+        response = input("\nEnter a number to view detailed info about the command, "
                          + "'p' to re-print, and 'q' to go back: ")
 
-        if response == 'q' or response == 'Q':
+        if response in {'q', 'Q'}:
             return
-        
-        elif response == 'p' or response == 'P':
-            print_commands(command)
+
+        if response in {'p', 'P'}:
+            print_commands(commands)
 
         elif response.isdigit():
             response = int(response)
             if response >= len(commands):
-                print("Invalid command nummber.")
+                print("Invalid command number.")
                 continue
             command = commands[response]
-            print(parse_AppCommand(command))
+            print(parse_app_command(command))
 
         else:
             print("Unrecognized command.")
@@ -159,17 +176,17 @@ async def command_control(command_tree):
         response = input("\nEnter 'l' to view local commands, 'v' to view the synced commands, "
                          + "'s' to sync commands, 'e' to restore removed local commands, and 'r' "
                          + "to run the bot: ")
-        
-        if response == 'l' or response == 'L':
+
+        if response in {'l', 'L'}:
             await local_commands(command_tree)
 
-        elif response == 'v' or response == 'V':
+        elif response in {'v', 'V'}:
             await synced_commands(command_tree)
 
-        elif response == 's' or response == 'S':
+        elif response in {'s', 'S'}:
             inner_response = input("\nSync globally? y/N: ")
             local_guild = True
-            if inner_response == 'y' or inner_response == 'Y':
+            if inner_response in {'y', 'Y'}:
                 local_guild = False
 
             if local_guild:
@@ -183,10 +200,10 @@ async def command_control(command_tree):
 
                 inner_response = input("\nThis will overwrite existing commands for guild "
                                         + str(response) + ". Are you sure? Y/n: ")
-                if inner_response == 'n' or inner_response == 'N':
+                if inner_response in {'n', 'N'}:
                     print("Aborted.")
                     continue
-    
+
                 # Copy the global commands to a guild, sync those commands, clean up
                 command_tree.copy_global_to(guild=discord.Object(response))
                 await command_tree.sync(guild=discord.Object(response))
@@ -196,25 +213,24 @@ async def command_control(command_tree):
                 command_tree.clear_commands(guild=discord.Object(response))
                 continue
 
-            else:
-                # Sync globally
-                inner_response = input("\nThis will overwrite existing global commands. It "
-                                        + "may also take up to an hour to register. "
-                                        + "Are you sure? Y/n: ")
-                if inner_response == 'n' or inner_response == 'N':
-                    print("Aborted.")
-                    continue
-                await command_tree.sync()
+            # Sync globally
+            inner_response = input("\nThis will overwrite existing global commands. It "
+                                    + "may also take up to an hour to register. "
+                                    + "Are you sure? Y/n: ")
+            if inner_response in {'n', 'N'}:
+                print("Aborted.")
                 continue
+            await command_tree.sync()
+            continue
 
-        elif response == 'e' or response == 'E':
+        elif response in {'e', 'E'}:
             restore_commands(command_tree, local_command_list)
-        
-        elif response == 'r' or response == 'R':
+
+        elif response in {'r', 'R'}:
             # Ensure that all commands are still available on the backend, even if they
             # can't be called
             restore_commands(command_tree, local_command_list)
             return
-        
+
         else:
             print("Unrecognized command.")
