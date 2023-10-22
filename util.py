@@ -19,32 +19,33 @@ class Card:
         return self.suit == other.suit\
                 and self.face == other.face\
                 and self.value == other.value
-    
-    def generate_deck():
-        deck = []
-        for suit in ('H', 'D', 'S', 'C'):
-            deck.append(suit, 'A', 1)
-            for value in range(2,11):
-                deck.append(Card(suit, str(value), value))
-            for face in ('J', 'Q', 'K'):
-                deck.append(suit, face, 10)
 
-    def bj_add(cards):
-        """
-        cards is a list of Card objects
-        returns an integer corresponding to the value of the hand in
-        a game of blackjack
-        """
-        total = 0
-        ace_count = 0
-        for card in cards:
-            if card.value != 1:
-                total += card.value
-            else:
-                ace_count += 1
-        total += 11 * ace_count
-        for ace in range(ace_count):
-            if total > 21:
-                total -= 10
-        return total
+
+def generate_deck():
+    deck = []
+    for suit in ('H', 'D', 'S', 'C'):
+        deck.append(suit, 'A', 1)
+        for value in range(2,11):
+            deck.append(Card(suit, str(value), value))
+        for face in ('J', 'Q', 'K'):
+            deck.append(suit, face, 10)
+
+def bj_add(cards):
+    """
+    cards is a list of Card objects
+    returns an integer corresponding to the value of the hand in
+    a game of blackjack
+    """
+    total = 0
+    ace_count = 0
+    for card in cards:
+        if card.value != 1:
+            total += card.value
+        else:
+            ace_count += 1
+    total += 11 * ace_count
+    for ace in range(ace_count):
+        if total > 21:
+            total -= 10
+    return total
             
