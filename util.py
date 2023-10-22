@@ -4,7 +4,7 @@ class Card:
     This data type represents the playing cards found in a standard
     52-card deck.
     """
-    def __init__(self, suit, face, value):
+    def __init__(self, suit, face):
         """
         suit is H, D, S, C, for Heart, Diamond, Spade, Club
         face is 2-10, J, Q, K, A, for the numbered and real face cards
@@ -13,22 +13,20 @@ class Card:
         """
         self.suit = suit
         self.face = face
-        self.value = value
 
     def __eq__(self, other):
         return self.suit == other.suit\
                 and self.face == other.face\
-                and self.value == other.value
 
 
 def generate_deck():
     deck = []
     for suit in ('H', 'D', 'S', 'C'):
-        deck.append(suit, 'A', 1)
+        deck.append(suit, 'A')
         for value in range(2,11):
-            deck.append(Card(suit, str(value), value))
+            deck.append(Card(suit, str(value)))
         for face in ('J', 'Q', 'K'):
-            deck.append(suit, face, 10)
+            deck.append(suit, face)
 
 def bj_add(cards):
     """
@@ -38,9 +36,12 @@ def bj_add(cards):
     """
     total = 0
     ace_count = 0
+    faces = ('A', 'J', 'Q', 'K')
     for card in cards:
-        if card.value != 1:
-            total += card.value
+        if card.face not in faces:
+            total += str(card.face)
+        elif card.face in faces[1:]:
+            total += 10
         else:
             ace_count += 1
     total += 11 * ace_count
