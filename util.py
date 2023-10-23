@@ -17,6 +17,9 @@ class Card:
     def __eq__(self, other):
         return self.suit == other.suit\
                 and self.face == other.face\
+    
+    def __str__(self):
+        return str(self.suit) + str(self.face)
 
 
 def generate_deck():
@@ -27,6 +30,7 @@ def generate_deck():
             deck.append(Card(suit, str(value)))
         for face in ('J', 'Q', 'K'):
             deck.append(Card(suit, face))
+    return deck
 
 def bj_add(cards):
     """
