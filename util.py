@@ -22,11 +22,11 @@ class Card:
 def generate_deck():
     deck = []
     for suit in ('H', 'D', 'S', 'C'):
-        deck.append(suit, 'A')
+        deck.append(Card(suit, 'A'))
         for value in range(2,11):
             deck.append(Card(suit, str(value)))
         for face in ('J', 'Q', 'K'):
-            deck.append(suit, face)
+            deck.append(Card(suit, face))
 
 def bj_add(cards):
     """
@@ -39,7 +39,7 @@ def bj_add(cards):
     faces = ('A', 'J', 'Q', 'K')
     for card in cards:
         if card.face not in faces:
-            total += str(card.face)
+            total += int(card.face)
         elif card.face in faces[1:]:
             total += 10
         else:
