@@ -1,4 +1,3 @@
-
 # Initialize important global variables
 token_file = open("configs/bot_token.txt", "r")
 global TOKEN

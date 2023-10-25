@@ -21,14 +21,21 @@ class Card:
     def __str__(self):
         return str(self.suit) + str(self.face)
 
+    
+    def __str__(self):
+        return str(self.suit) + str(self.face)
+
 
 def generate_deck():
     deck = []
     for suit in ('H', 'D', 'S', 'C'):
         deck.append(Card(suit, 'A'))
+        deck.append(Card(suit, 'A'))
         for value in range(2,11):
             deck.append(Card(suit, str(value)))
         for face in ('J', 'Q', 'K'):
+            deck.append(Card(suit, face))       
+    return deck
             deck.append(Card(suit, face))
     return deck
 
