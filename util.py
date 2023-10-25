@@ -36,26 +36,4 @@ def generate_deck():
         for face in ('J', 'Q', 'K'):
             deck.append(Card(suit, face))       
     return deck
-
-def bj_add(cards):
-    """
-    cards is a list of Card objects
-    returns an integer corresponding to the value of the hand in
-    a game of blackjack
-    """
-    total = 0
-    ace_count = 0
-    faces = ('A', 'J', 'Q', 'K')
-    for card in cards:
-        if card.face not in faces:
-            total += int(card.face)
-        elif card.face in faces[1:]:
-            total += 10
-        else:
-            ace_count += 1
-    total += 11 * ace_count
-    for ace in range(ace_count):
-        if total > 21:
-            total -= 10
-    return total
-            
+     
