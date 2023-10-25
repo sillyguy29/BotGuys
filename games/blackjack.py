@@ -20,11 +20,12 @@ class BlackjackGame(BaseGame):
         super().__init__(game_type=1)
         
         self.deck = generate_deck()
+        random.shuffle(self.deck)
  
         
 class BlackjackManager(GameManager):
-    def __init__(self, factory, channel_id):
-        super().__init__(BlackjackGame(), BlackjackButtonsBase(self), channel_id, factory)
+    def __init__(self, factory, channel_id, players, cpus):
+        super().__init__(BlackjackGame(), BlackjackButtonsBase(self), channel_id, factory, players, cpus)
         
     def get_base_menu_string(self):
         return "Welcome to this game of Blackjack. Feel free to join."

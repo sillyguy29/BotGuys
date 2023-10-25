@@ -43,7 +43,7 @@ class GameManager():
     Methods can (and should) be overridden but be careful when doing so as to not
     break the default flow of all games
     """
-    def __init__(self, game, base_gui, channel_id, factory):
+    def __init__(self, game, base_gui, channel_id, factory, players, cpus):
         # hold the game model that this manager needs to manage (pass constructor to
         # subclass of BaseGame for that game)
         self.game = game
@@ -54,6 +54,10 @@ class GameManager():
         # reference to the GameFactory class, needed to remove the game from the active games
         # dict upon the game ending
         self.factory = factory
+        # amount of human players
+        self.players = players
+        # amount of computer players
+        self.cpus = cpus
         # reference to the message that currently contains the base menu. Needed so that the
         # bot can remove the buttons from it or edit its contents at any time
         self.current_active_menu = None
