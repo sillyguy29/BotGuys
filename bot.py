@@ -42,6 +42,15 @@ def create_commands(client):
     async def play_counter(interaction: discord.Interaction):
         print(f"{interaction.user} is starting a game!")
         await client.game_manager.start_game(interaction, 0)
+        
+    @client.tree.command(name="blackjack", description="Play a game of Blackjack")
+    @discord.app_commands.describe(
+        players="Amount of human players",
+        cpus="Amount of cpu players"
+    )
+    async def play_blackjack(interaction: discord.Interaction, players: int, cpus: int):
+        print(f"{interaction.user} is starting a game with {players} human players and {cpus} computer players!")
+        await client.game_manager.start_game(interaction, 1)
 
 
 def run_bot():
