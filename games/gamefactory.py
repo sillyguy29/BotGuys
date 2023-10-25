@@ -13,7 +13,7 @@ class GameFactory():
     def __init__(self):
         self.active_games = {}
 
-    async def start_game(self, interaction, game_type):
+    async def start_game(self, interaction, game_type, players=0, cpus=0):
         """
         Starts a game specified by the ID of game_type.
 
