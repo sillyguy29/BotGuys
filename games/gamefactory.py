@@ -1,6 +1,7 @@
 """Contains the factory that manages all active games.
 """
 from games.counter import CounterManager
+from games.blackjack import BlackjackManager
 
 
 class GameFactory():
@@ -19,6 +20,7 @@ class GameFactory():
         ID Key:
         ----
         0 = Counter
+        1 = Blackjack
         """
         if interaction.channel_id in self.active_games:
             await interaction.response.send_message(content="A game has already"
@@ -27,6 +29,10 @@ class GameFactory():
 
         if game_type == 0:
             new_game = CounterManager(self, interaction.channel_id)
+            self.active_games[interaction.channel_id] = new_game
+            
+        if game_type == 1:
+            new_game = BlackjackManager(self, interaction.channel_id)
             self.active_games[interaction.channel_id] = new_game
 
         await new_game.create_game(interaction)

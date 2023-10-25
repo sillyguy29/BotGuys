@@ -85,7 +85,7 @@ class HitOrMiss(discord.ui.View):
         self.stop()
         await self.manager.increment(interaction)
 
-    @discord.ui.button(label = "Miss Me!", style = discord.ButtonStyle.green)
+    @discord.ui.button(label = "Miss Me!", style = discord.ButtonStyle.red)
     async def miss_me(self, interaction: discord.Interaction, button: discord.ui.Button):
         """
         Call decrement
