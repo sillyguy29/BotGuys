@@ -120,3 +120,28 @@ def play_bj(deck, action):
         
         if action == "Stand":
             break
+
+
+
+# This method takes a hand as a parameter
+#       A hand is a list of Card objects
+# The function executes the flowchart logic of the dealer
+#       Hit on 16 or less
+#       Stand on 17 or greater
+# Then the method returns a decision as a string:
+#      "Hit" or "Stand"
+def AI_Decision(hand):
+    score = 0
+    for card in hand:
+        v = card.value
+        if v=='A': continue # Skip aces for now, come back to this
+        if v=='J' or v=='Q' or v=='K': score += 10
+        else: score += int(v)
+
+    for card in hand: # Let's work out aces now
+        v = card.value
+        if v=='A' and score+11 <= 21: score += 11
+        else: score += 1
+
+    if score < 17: return "Hit"
+    if score > 16: return "Stand"
