@@ -17,7 +17,7 @@ class LanternClient(discord.Client):
     def __init__(self, *, intents: discord.Intents):
         super().__init__(intents=intents)
         self.tree = discord.app_commands.CommandTree(self)
-        self.game_manager = gamefactory.GameFactory()
+        self.game_factory = gamefactory.GameFactory()
 
 
     async def setup_hook(self):
@@ -41,7 +41,7 @@ def create_commands(client):
     @client.tree.command(name="counter", description="Play a simple counter game")
     async def play_counter(interaction: discord.Interaction):
         print(f"{interaction.user} is starting a game!")
-        await client.game_manager.start_game(interaction, 0)
+        await client.game_factory.start_game(interaction, 0)
         
     @client.tree.command(name="blackjack", description="Play a game of Blackjack")
     @discord.app_commands.describe(
@@ -50,7 +50,7 @@ def create_commands(client):
     )
     async def play_blackjack(interaction: discord.Interaction, players: int, cpus: int):
         print(f"{interaction.user} is starting a game with {players} human players and {cpus} computer players!")
-        await client.game_manager.start_game(interaction, 1)
+        await client.game_factory.start_game(interaction, 1, players, cpus)
 
 
 def run_bot():

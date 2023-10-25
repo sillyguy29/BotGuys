@@ -36,4 +36,4 @@ def generate_deck():
         for face in ('J', 'Q', 'K'):
             deck.append(Card(suit, face))       
     return deck
-     
+            
