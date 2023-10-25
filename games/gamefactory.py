@@ -32,7 +32,7 @@ class GameFactory():
             self.active_games[interaction.channel_id] = new_game
             
         if game_type == 1:
-            new_game = BlackjackManager(self, interaction.channel_id)
+            new_game = BlackjackManager(self, interaction.channel_id, players, cpus)
             self.active_games[interaction.channel_id] = new_game
 
         await new_game.create_game(interaction)

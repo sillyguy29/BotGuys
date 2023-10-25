@@ -43,7 +43,7 @@ class GameManager():
     Methods can (and should) be overridden but be careful when doing so as to not
     break the default flow of all games
     """
-    def __init__(self, game, base_gui, channel_id, factory, players, cpus):
+    def __init__(self, game, base_gui, channel_id, factory, players=0, cpus=0):
         # hold the game model that this manager needs to manage (pass constructor to
         # subclass of BaseGame for that game)
         self.game = game
