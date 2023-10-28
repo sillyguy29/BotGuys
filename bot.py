@@ -45,8 +45,8 @@ def create_commands(client):
         
     @client.tree.command(name="blackjack", description="Play a game of Blackjack")
     @discord.app_commands.describe(
-        players="Amount of human players",
-        cpus="Amount of cpu players"
+        players="Amount of human players (max of 6)",
+        cpus="Amount of cpu players (max of 3)"
     )
     async def play_blackjack(interaction: discord.Interaction, players: int, cpus: int):
         print(f"{interaction.user} is starting a game with {players} human players and {cpus} computer players!")
