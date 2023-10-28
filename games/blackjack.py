@@ -53,6 +53,35 @@ class BlackjackManager(GameManager):
         
         # resend the base menu with the updated game state
         await self.resend(interaction)
+
+    async def hit_user(self, interaction):
+        """
+        Adds a card to the user's hand
+        """
+        # check to make sure the game hasn't ended, do nothing if it has
+        if await self.game_end_check(interaction):
+            return
+        
+        # add a card to the user's hand
+        c = self.game.deck.pop()
+        self.game.players_list[0].hand.add(c)
+        # resend the base menu with the updated game state
+        await self.resend(interaction)
+
+    async def stand_user(self, interaction):
+        """
+        Ends the user's turn
+        """
+        # check to make sure the game hasn't ended, do nothing if it has
+        if await self.game_end_check(interaction):
+            return
+        
+        # more interaction to be added to actually make it go to the next player
+        
+        # resend the base menu with the updated game state
+        await self.resend(interaction)
+
+    
         
     async def remove_all_players(self):
         """
@@ -93,6 +122,35 @@ class BlackjackButtonsBase(discord.ui.View):
         self.manager.remove_all_players
         # ask our manager to quit this game
         await self.manager.quit_game(interaction)
+
+
+class HitOrStand(discord.ui.View):
+    """
+    Button group used for the Blackjack game when the user can Hit or Stand as their options
+    """
+    def __init__(self, manager):
+        super().__init__()
+        self.manager = manager
+
+    @discord.ui.button(label = "Hit Me", style = discord.ButtonStyle.green)
+    async def hit_me(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        Call hit_user
+        """
+        print(f"{interaction.user} pressed {button.label}!")
+        # stop accepting interactions for this message
+        self.stop()
+        await self.manager.hit_user(interaction)
+
+    @discord.ui.button(label = "Stand", style = discord.ButtonStyle.blurple)
+    async def stand(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        Call stand_user
+        """
+        print(f"{interaction.user} pressed {button.label}!")
+        # stop accepting interactions for this message
+        self.stop()
+        await self.manager.stand_user(interaction)
         
         
 def bj_add(cards):
