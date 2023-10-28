@@ -43,7 +43,7 @@ class GameManager():
     Methods can (and should) be overridden but be careful when doing so as to not
     break the default flow of all games
     """
-    def __init__(self, game, base_gui, channel_id, factory, players=0, cpus=0):
+    def __init__(self, game, base_gui, channel_id, factory, user_id, players=0, cpus=0):
         # hold the game model that this manager needs to manage (pass constructor to
         # subclass of BaseGame for that game)
         self.game = game
@@ -54,6 +54,8 @@ class GameManager():
         # reference to the GameFactory class, needed to remove the game from the active games
         # dict upon the game ending
         self.factory = factory
+        # user who called command
+        self.user_id = user_id
         # amount of human players
         self.players = players
         # amount of computer players
