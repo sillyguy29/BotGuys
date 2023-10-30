@@ -43,7 +43,7 @@ class BlackjackManager(GameManager):
             return
         
         if len(self.game.players_list) < 6 and interaction.user not in self.game.players_list:
-            print(interaction.user + "was added to the players list!")
+            print(f"{interaction.user} was added to the players list!")
             await interaction.response.send_message("You joined!", ephemeral = True)
             self.game.players_list.append(interaction.user)
             await self.factory.add_player(interaction.user)
