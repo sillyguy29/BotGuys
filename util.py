@@ -21,10 +21,6 @@ class Card:
     def __str__(self):
         return str(self.suit) + str(self.face)
 
-    
-    def __str__(self):
-        return str(self.suit) + str(self.face)
-
 
 def generate_deck():
     deck = []

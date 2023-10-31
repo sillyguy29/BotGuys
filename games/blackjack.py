@@ -17,42 +17,25 @@ class BlackjackGame(BaseGame):
     Blackjack game model class. Keeps track of the deck and none else
     """
     def __init__(self):
-        super().__init__(game_type=1)
+        # game state 1 -> accepting players but not playing yet
+        super().__init__(game_type=1, player_data={}, game_state=1)
         
         self.deck = generate_deck()
         random.shuffle(self.deck)
-        
-        self.players_list = []
  
         
 class BlackjackManager(GameManager):
-    def __init__(self, factory, channel_id, user_id, players, cpus):
-        super().__init__(BlackjackGame(), BlackjackButtonsBase(self), channel_id, factory, user_id, players, cpus)
+    def __init__(self, factory, channel_id, user_id):
+        super().__init__(BlackjackGame(), BlackjackButtonsBase(self),
+                         channel_id, factory)
         
-        self.game.players_list.append(user_id)
+        self.game.player_list.append(user_id)
+
+    async def create_game(self, interaction):
+        raise NotImplementedError("Override this method based on blackjack specifications")
         
     def get_base_menu_string(self):
         return "Welcome to this game of Blackjack. Feel free to join."
-    
-    async def add_player(self, interaction):
-        """
-        Adds the players who joined to the players list
-        """
-        # check to make sure the game hasn't ended, do nothing if it has
-        if await self.game_end_check(interaction):
-            return
-        
-        if len(self.game.players_list) < 6 and interaction.user not in self.game.players_list:
-            print(interaction.user + "was added to the players list!")
-            await interaction.response.send_message("You joined!", ephemeral = True)
-            self.game.players_list.append(interaction.user)
-            await self.factory.add_player(interaction.user)
-        else:
-            await interaction.response.send_message("You were unable to join!", ephemeral = True)
-            return
-        
-        # resend the base menu with the updated game state
-        await self.resend(interaction)
 
     async def hit_user(self, interaction):
         """
@@ -64,7 +47,7 @@ class BlackjackManager(GameManager):
         
         # add a card to the user's hand
         c = self.game.deck.pop()
-        self.game.players_list[0].hand.add(c)
+        self.game.player_list[0].hand.add(c)
         # resend the base menu with the updated game state
         await self.resend(interaction)
 
@@ -81,13 +64,12 @@ class BlackjackManager(GameManager):
         # resend the base menu with the updated game state
         await self.resend(interaction)
 
-    
         
     async def remove_all_players(self):
         """
         Removes all players from the players list
         """
-        await self.factory.remove_players(self.game.players_list)
+        await self.factory.remove_players(self.game.player_list)
 
      
 class BlackjackButtonsBase(discord.ui.View):
@@ -107,8 +89,9 @@ class BlackjackButtonsBase(discord.ui.View):
         # print when someone presses the button because otherwise
         # pylint won't shut up about button being unused
         print(f"{interaction.user} pressed {button.label}!")
-        # attempt to add player to the game
-        await self.manager.add_player(interaction)
+        # TODO: the second arg should contain a class or data structure that contains
+        # all the data needed for a player in this game
+        await self.manager.add_player(interaction, None)
     
     @discord.ui.button(label = "Quit", style = discord.ButtonStyle.red)
     async def quit(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -119,9 +102,10 @@ class BlackjackButtonsBase(discord.ui.View):
         # pylint won't shut up about button being unused
         print(f"{interaction.user} pressed {button.label}!")
         # remove current players from active player list
-        self.manager.remove_all_players
-        # ask our manager to quit this game
-        await self.manager.quit_game(interaction)
+        self.manager.remove_player(interaction)
+        # if nobody else is left, then quit the game
+        if self.game.players == 0:
+            await self.manager.quit_game(interaction)
 
 
 class HitOrStand(discord.ui.View):
