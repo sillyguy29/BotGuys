@@ -21,6 +21,7 @@ class BlackjackGame(BaseGame):
         super().__init__(game_type=1, player_data={}, game_state=1)
         
         self.deck = generate_deck()
+        self.dealer_hand = []
         random.shuffle(self.deck)
 
     #def __repr__(self):
@@ -74,6 +75,27 @@ class BlackjackManager(GameManager):
         Removes all players from the players list
         """
         await self.factory.remove_players(self.game.player_list)
+
+    async def gameplay_loop(self):
+        """
+        The main gameplay loop for the Blackjack game
+        """
+        rounds = 3 # Temporary, 3 rounds of gameplay
+        for round in range(rounds):
+            # Get Dealer's Hand
+            self.game.dealer_hand.append(self.game.deck.pop())
+
+            # add code here to send message indicating dealer hand
+            
+            player_turn_list = list(range(self.game.players))
+            for turn in player_turn_list:
+                #Iterates through dict of player data to find the turn
+                current_user = [x for x in self.game.player_data if x["turn"] == turn][0]
+
+                view = HitOrStand(self)
+                await current_user.send("Hit or Stand?", view=view)
+
+
 
      
 class BlackjackButtonsBase(discord.ui.View):
