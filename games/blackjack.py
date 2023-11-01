@@ -93,15 +93,35 @@ class BlackjackManager(GameManager):
             # Get Dealer's Hand
             self.game.dealer_hand.append(self.game.deck.pop())
 
-            # add code here to send message indicating dealer hand
+            #TODO add code here to send message indicating dealer hand
             
             player_turn_list = list(range(self.game.players))
             for turn in player_turn_list:
                 #Iterates through dict of player data to find the turn
                 current_user = [x for x in self.game.player_data if x["turn"] == turn][0]
 
-                view = HitOrStand(self)
-                await current_user.send("Hit or Stand?", view=view)
+                while(True):
+                    # Break if they bust, stand, or reach 21
+                    view = HitOrStand(self)
+                    await current_user.send_message("Hit or Stand?", view=view, ephemeral=True)
+                    await view.wait() # Wait for user to press a button
+                    user_hand = current_user["hand"]
+                    user_hand_value = bj_add(user_hand)
+                    if bj_add(user_hand) > 21:
+                        # Bust
+                        break
+                    elif bj_add(user_hand) == 21:
+                        # Blackjack
+                        break
+                    else:
+                        # Hit
+                        continue
+                    #TODO add code to detect if user stood and break
+                    
+
+
+
+
 
      
 class BlackjackButtonsBase(discord.ui.View):
