@@ -4,20 +4,27 @@ Defines abstract classes for the model and manager which are used to
 control basic things that exist for all game types, such as starting,
 players joining/leaving, ending the game, etc
 """
-
+import discord
 
 class BaseGame():
     """
     Game model class. Member vars should only be accessed by its manager or AI functions.
     """
-    def __init__(self, game_type=0, player_list=None, game_state=0):
+    def __init__(self, game_type=0, player_data=None, game_state=0, user_id=None, players=0, cpus=0, max_players=0):
         # ID value of the game type
         self.game_type = game_type
         # list of players engaged with this game
-        self.player_list = player_list
+        self.player_data = player_data
+        # user who called command
+        self.user_id = user_id
+        # amount of human players
+        self.players = players
+        # amount of computer players
+        self.cpus = cpus
         # current game state, used to help manage certain outside interactions
         # game_state = 0 -> game is open to anyone at any time
         self.game_state = game_state
+        self.max_players = max_players
 
     def has_ended(self):
         """
@@ -33,7 +40,7 @@ class BaseGame():
         # counter is an open game, and thus does not accept players
         # change method to check game state upon non-open games being
         # made
-        return False
+        return self.max_players > self.players
 
 
 class GameManager():
@@ -43,7 +50,7 @@ class GameManager():
     Methods can (and should) be overridden but be careful when doing so as to not
     break the default flow of all games
     """
-    def __init__(self, game, base_gui, channel_id, factory, user_id, players=0, cpus=0):
+    def __init__(self, game, base_gui, channel_id, factory):
         # hold the game model that this manager needs to manage (pass constructor to
         # subclass of BaseGame for that game)
         self.game = game
@@ -54,12 +61,6 @@ class GameManager():
         # reference to the GameFactory class, needed to remove the game from the active games
         # dict upon the game ending
         self.factory = factory
-        # user who called command
-        self.user_id = user_id
-        # amount of human players
-        self.players = players
-        # amount of computer players
-        self.cpus = cpus
         # reference to the message that currently contains the base menu. Needed so that the
         # bot can remove the buttons from it or edit its contents at any time
         self.current_active_menu = None
@@ -116,6 +117,7 @@ class GameManager():
         self.game.game_state = -1
         await self.current_active_menu.edit(view=None)
         await self.factory.stop_game(self.channel_id)
+        # now we just pray that python's garbage collection notices this
 
     def get_base_menu_string(self):
         """
@@ -124,6 +126,53 @@ class GameManager():
         """
         # might be a good idea to replace this with an exception
         return "Generic game menu message"
+
+    async def add_player(self, interaction, init_player_data=None):
+        """
+        Check whether a player can be added to the game in its current state, and if so,
+        add them and associate them with init_player_data.
+        """
+        # see if game has already ended, return if it has
+        if await self.game_end_check(interaction):
+            return
+        
+        if self.game.game_state == 0:
+            await interaction.response.send_message("This game is open to any player at any time.",
+                                                     ephemeral = True, delete_after = 10)
+        elif self.game.game_state in (1, 2):
+            if interaction.user in self.game.player_data():
+                await interaction.response.send_message("You are already in this game.",
+                                                        ephemeral = True, delete_after = 10)
+            else:
+                self.game.players += 1
+                self.game.player_data[interaction.user] = init_player_data
+                await interaction.response.send_message("Joined game.", ephemeral = True, 
+                                                        delete_after = 10)
+        else:
+            await interaction.response.send_message("This game is not currently accepting players.",
+                                                     ephemeral = True, delete_after = 10)
+
+    async def remove_player(self, interaction):
+        """
+        Check whether a player can leave the game in its current state, and if so, remove
+        """
+        # see if game has already ended, return if it has
+        if await self.game_end_check(interaction):
+            return
+
+        if self.game.game_state == 0:
+            await interaction.response.send_message("This game is open to any player at any time.",
+                                                     ephemeral = True, delete_after = 10)
+        elif interaction.user not in self.game.player_data:
+            await interaction.response.send_message("You are not in this game.",
+                                                     ephemeral = True, delete_after = 10)
+        elif self.game.game_state in (1, 3):
+            self.game.players -= 1
+            self.game.player_data.pop(interaction.user)
+            await interaction.response.send_message("Left game.", ephemeral=True, delete_after=10)
+        else:
+            await interaction.response.send_message("You cannot leave this game right now.",
+                                                     ephemeral = True, delete_after = 10)
 
     async def game_end_check(self, interaction):
         """
@@ -140,3 +189,20 @@ class GameManager():
             return True
         # False -> game has not ended
         return False
+    
+
+#async def double_check(interaction):
+
+
+class AreYouSureButtons(discord.ui.View):
+    """
+    Helper class designed to facilitate a double check from the user upon trying to perform
+    certain actions
+    """
+    @discord.ui.button(label = "Yes", style = discord.ButtonStyle.green)
+    async def yes_pressed(self, interaction: discord.Interaction, button: discord.ui.Button):
+        return (True, interaction)
+    
+    @discord.ui.button(label = "No", style = discord.ButtonStyle.red)
+    async def no_pressed(self, interaction: discord.Interaction, button: discord.ui.Button):
+        return (False, interaction)
