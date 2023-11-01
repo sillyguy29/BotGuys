@@ -21,6 +21,7 @@ class BlackjackGame(BaseGame):
         super().__init__(game_type=1, player_data={}, game_state=1)
         
         self.deck = generate_deck()
+        self.dealer_hand = []
         random.shuffle(self.deck)
 
     #def __repr__(self):
@@ -83,6 +84,27 @@ class BlackjackManager(GameManager):
         """
         await self.factory.remove_players(self.game.player_list)
 
+    async def gameplay_loop(self):
+        """
+        The main gameplay loop for the Blackjack game
+        """
+        rounds = 3 # Temporary, 3 rounds of gameplay
+        for round in range(rounds):
+            # Get Dealer's Hand
+            self.game.dealer_hand.append(self.game.deck.pop())
+
+            # add code here to send message indicating dealer hand
+            
+            player_turn_list = list(range(self.game.players))
+            for turn in player_turn_list:
+                #Iterates through dict of player data to find the turn
+                current_user = [x for x in self.game.player_data if x["turn"] == turn][0]
+
+                view = HitOrStand(self)
+                await current_user.send("Hit or Stand?", view=view)
+
+
+
      
 class BlackjackButtonsBase(discord.ui.View):
     def __init__(self, manager):
@@ -104,12 +126,12 @@ class BlackjackButtonsBase(discord.ui.View):
         # TODO: the second arg should contain a class or data structure that contains
         # all the data needed for a player in this game
         if self.manager.game.is_accepting_players():
-            player_data = dict()
-            player_data["hand"] = []
-            player_data["chips"] = 0
+            indi_player_data = dict()
+            indi_player_data["hand"] = []
+            indi_player_data["chips"] = 0
             #player turn order determined by the order in which players join
-            player_data["turn"] = self.manager.game.players
-            await self.manager.add_player(interaction, player_data)
+            indi_player_data["turn"] = self.manager.game.players
+            await self.manager.add_player(interaction, indi_player_data)
         else:
             await interaction.response.send_message("This game is not currently accepting players.",
                                                      ephemeral = True, delete_after = 10)
