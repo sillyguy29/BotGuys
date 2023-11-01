@@ -40,7 +40,7 @@ class BaseGame():
         # counter is an open game, and thus does not accept players
         # change method to check game state upon non-open games being
         # made
-        return False
+        return self.max_players > self.players
 
 
 class GameManager():
@@ -194,7 +194,7 @@ class GameManager():
 #async def double_check(interaction):
 
 
-class AreYouSureButtons(discord.ui.view):
+class AreYouSureButtons(discord.ui.View):
     """
     Helper class designed to facilitate a double check from the user upon trying to perform
     certain actions

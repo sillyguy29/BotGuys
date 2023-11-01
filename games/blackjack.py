@@ -22,6 +22,8 @@ class BlackjackGame(BaseGame):
         
         self.deck = generate_deck()
         random.shuffle(self.deck)
+
+    #def __repr__(self):
  
         
 class BlackjackManager(GameManager):
@@ -29,6 +31,7 @@ class BlackjackManager(GameManager):
         super().__init__(BlackjackGame(), BlackjackButtonsBase(self),
                          channel_id, factory)
         
+        # What is player_list? We have player_data (dict) in the game model
         self.game.player_list.append(user_id)
 
     async def create_game(self, interaction):
@@ -47,7 +50,8 @@ class BlackjackManager(GameManager):
         
         # add a card to the user's hand
         c = self.game.deck.pop()
-        self.game.player_list[0].hand.add(c)
+        self.game.player_data[interaction.user]["hand"].append(c)
+        
         # resend the base menu with the updated game state
         await self.resend(interaction)
 
@@ -91,7 +95,16 @@ class BlackjackButtonsBase(discord.ui.View):
         print(f"{interaction.user} pressed {button.label}!")
         # TODO: the second arg should contain a class or data structure that contains
         # all the data needed for a player in this game
-        await self.manager.add_player(interaction, None)
+        if self.manager.game.is_accepting_players():
+            player_data = dict()
+            player_data["hand"] = []
+            player_data["chips"] = 0
+            #player turn order determined by the order in which players join
+            player_data["turn"] = self.manager.game.players
+            await self.manager.add_player(interaction, player_data)
+        else:
+            await interaction.response.send_message("This game is not currently accepting players.",
+                                                     ephemeral = True, delete_after = 10)
     
     @discord.ui.button(label = "Quit", style = discord.ButtonStyle.red)
     async def quit(self, interaction: discord.Interaction, button: discord.ui.Button):
