@@ -96,12 +96,12 @@ class BlackjackButtonsBase(discord.ui.View):
         # TODO: the second arg should contain a class or data structure that contains
         # all the data needed for a player in this game
         if self.manager.game.is_accepting_players():
-            player_data = dict()
-            player_data["hand"] = []
-            player_data["chips"] = 0
+            indi_player_data = dict()
+            indi_player_data["hand"] = []
+            indi_player_data["chips"] = 0
             #player turn order determined by the order in which players join
-            player_data["turn"] = self.manager.game.players
-            await self.manager.add_player(interaction, player_data)
+            indi_player_data["turn"] = self.manager.game.players
+            await self.manager.add_player(interaction, indi_player_data)
         else:
             await interaction.response.send_message("This game is not currently accepting players.",
                                                      ephemeral = True, delete_after = 10)
