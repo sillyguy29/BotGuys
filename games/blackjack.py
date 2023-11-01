@@ -41,7 +41,7 @@ class BlackjackManager(GameManager):
     async def start_game(self, interaction):
         # game_state == 4 -> players cannot join or leave
         self.game.game_state = 4
-        self.gameplay_loop()
+        await self.gameplay_loop()
         
     def get_base_menu_string(self):
         if self.game.game_state == 1:
@@ -179,7 +179,7 @@ class BlackjackButtonsBase(discord.ui.View):
         # pylint won't shut up about button being unused
         print(f"{interaction.user} pressed {button.label}!")
         # start the game
-        self.manager.start_game(interaction)
+        await self.manager.start_game(interaction)
 
 
 class HitOrStand(discord.ui.View):
