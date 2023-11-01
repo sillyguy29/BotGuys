@@ -37,9 +37,17 @@ class BlackjackManager(GameManager):
 
     async def create_game(self, interaction):
         raise NotImplementedError("Override this method based on blackjack specifications")
+    
+    async def start_game(self, interaction):
+        # game_state == 4 -> players cannot join or leave
+        self.game.game_state = 4
+        self.gameplay_loop()
         
     def get_base_menu_string(self):
-        return "Welcome to this game of Blackjack. Feel free to join."
+        if self.game.game_state == 1:
+            return "Welcome to this game of Blackjack. Feel free to join."
+        elif self.game.game_state == 4:
+            return "Game has started, placeholder string"
 
     async def hit_user(self, interaction):
         """
@@ -141,6 +149,17 @@ class BlackjackButtonsBase(discord.ui.View):
         # if nobody else is left, then quit the game
         if self.game.players == 0:
             await self.manager.quit_game(interaction)
+
+    @discord.ui.button(label = "Start game", style = discord.ButtonStyle.blurple)
+    async def start(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        Start the game
+        """
+        # print when someone presses the button because otherwise
+        # pylint won't shut up about button being unused
+        print(f"{interaction.user} pressed {button.label}!")
+        # start the game
+        self.manager.start_game(interaction)
 
 
 class HitOrStand(discord.ui.View):
