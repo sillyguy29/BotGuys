@@ -33,18 +33,18 @@ def generate_deck():
     return deck
  
             
-def generate_deck_UNO():
+def generate_deck_Uno():
     deck = []
     for color in ('Red', 'Yellow', 'Green', 'Blue'):
         deck.append(Card(color, '0'))
         for value in range(1,10):
             deck.append(Card(color, str(value)))
             deck.append(Card(color, str(value)))
-        for value in range(0,2):
+        for value in range(2):
             deck.append(Card(color, "+2"))
             deck.append(Card(color, "Reverse"))
             deck.append(Card(color, "Skip"))
-    for value in range(0,4):
+    for value in range(4):
         deck.append(Card("Wild", ""))
         deck.append(Card("Wild", "+4"))
     return deck
