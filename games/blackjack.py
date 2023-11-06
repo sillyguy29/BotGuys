@@ -41,7 +41,7 @@ class BlackjackManager(GameManager):
     async def start_game(self, interaction):
         # game_state == 4 -> players cannot join or leave
         self.game.game_state = 4
-        self.gameplay_loop()
+        await self.gameplay_loop()
         
     def get_base_menu_string(self):
         if self.game.game_state == 1:
@@ -118,8 +118,6 @@ class BlackjackManager(GameManager):
                         continue
                     #TODO add code to detect if user stood and break
                     
-
-
 
 
 
