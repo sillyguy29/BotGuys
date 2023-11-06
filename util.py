@@ -26,10 +26,25 @@ def generate_deck():
     deck = []
     for suit in ('H', 'D', 'S', 'C'):
         deck.append(Card(suit, 'A'))
-        deck.append(Card(suit, 'A'))
         for value in range(2,11):
             deck.append(Card(suit, str(value)))
         for face in ('J', 'Q', 'K'):
             deck.append(Card(suit, face))       
     return deck
+ 
             
+def generate_deck_UNO():
+    deck = []
+    for color in ('Red', 'Yellow', 'Green', 'Blue'):
+        deck.append(Card(color, '0'))
+        for value in range(1,10):
+            deck.append(Card(color, str(value)))
+            deck.append(Card(color, str(value)))
+        for value in range(0,2):
+            deck.append(Card(color, "+2"))
+            deck.append(Card(color, "Reverse"))
+            deck.append(Card(color, "Skip"))
+    for value in range(0,4):
+        deck.append(Card("Wild", ""))
+        deck.append(Card("Wild", "+4"))
+    return deck

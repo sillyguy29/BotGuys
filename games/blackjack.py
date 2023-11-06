@@ -177,24 +177,7 @@ class BlackjackButtonsBase(discord.ui.View):
         # pylint won't shut up about button being unused
         print(f"{interaction.user} pressed {button.label}!")
         # start the game
-        await self.manager.start_game(interaction)
-
-
-class BlackjackButtonsBaseGame(discord.ui.View):
-    def __init__(self, manager):
-        super().__init__()
-        self.manager = manager
-
-    @discord.ui.button(label = "Resend", style = discord.ButtonStyle.gray)
-    async def start(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """
-        Resend base menu message
-        """
-        # print when someone presses the button because otherwise
-        # pylint won't shut up about button being unused
-        print(f"{interaction.user} pressed {button.label}!")
-        # resend
-        await self.manager.resend(interaction)
+        self.manager.start_game(interaction)
 
 
 class HitOrStand(discord.ui.View):
