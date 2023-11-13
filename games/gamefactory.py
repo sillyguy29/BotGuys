@@ -33,7 +33,7 @@ class GameFactory():
             self.active_games[interaction.channel_id] = new_game
             await new_game.create_game(interaction)
 
-        if game_type == 1:
+        elif game_type == 1:
             new_game = BlackjackManager(self, interaction.channel_id, interaction.user,
                                          players, cpus)
             self.active_games[interaction.channel_id] = new_game
@@ -46,8 +46,6 @@ class GameFactory():
 
         else:
             raise ValueError("Unrecognized game type")
-
-        #await new_game.create_game(interaction)
 
 
     async def stop_game(self, channel_id):
