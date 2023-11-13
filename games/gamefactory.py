@@ -13,7 +13,7 @@ class GameFactory():
     def __init__(self):
         self.active_games = {}
 
-    async def start_game(self, interaction, game_type, players=0, cpus=0):
+    async def start_game(self, interaction, game_type, cpus=0):
         """
         Starts a game specified by the ID of game_type.
 
@@ -33,7 +33,7 @@ class GameFactory():
             await new_game.create_game(interaction)
 
         elif game_type == 1:
-            new_game = BlackjackManager(self, interaction.channel_id, interaction.user)
+            new_game = BlackjackManager(self, interaction.channel_id, cpus)
             self.active_games[interaction.channel_id] = new_game
             await new_game.create_game(interaction)
 

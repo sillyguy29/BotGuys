@@ -148,7 +148,7 @@ class GameManager():
             await interaction.response.send_message("This game is open to any player at any time.",
                                                      ephemeral = True, delete_after = 10)
         elif self.game.game_state in (1, 2):
-            if interaction.user in self.game.player_data():
+            if interaction.user in self.game.player_data:
                 await interaction.response.send_message("You are already in this game.",
                                                         ephemeral = True, delete_after = 10)
             else:
