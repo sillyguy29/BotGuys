@@ -12,11 +12,19 @@ from util import Card
 from util import generate_deck
 import random
 
+class BJDeck:
+    def __init__(self):
+        
+
+class BJHand:
+    def __init__(self):
+
+
 class BlackjackPlayer(BasePlayer):
-    def __init__(self, hand=[], chips=300):
+    def __init__(self, hand, chips=300):
         super.__init__()
 
-        self.hand = hand
+        self.hand = []
         self.chips = chips
 
 
@@ -24,11 +32,11 @@ class BlackjackGame(BaseGame):
     """
     Blackjack game model class. Keeps track of the deck and none else
     """
-    def __init__(self, turn_order=[]):
+    def __init__(self):
         # game state 1 -> accepting players but not playing yet
         super().__init__(game_type=1, player_data={}, game_state=1)
 
-        self.turn_order = turn_order
+        self.turn_order = []
         self.deck = generate_deck()
         self.dealer_hand = []
         random.shuffle(self.deck)
@@ -40,13 +48,11 @@ class BlackjackManager(GameManager):
     def __init__(self, factory, channel_id, user_id):
         super().__init__(game=BlackjackGame(), base_gui=BlackjackButtonsBase(self),
                          channel_id=channel_id, factory=factory)
-
-    async def create_game(self, interaction):
-        raise NotImplementedError("Override this method based on blackjack specifications")
     
     async def start_game(self, interaction):
         # game_state == 4 -> players cannot join or leave
         self.game.game_state = 4
+        self.base_gui = BlackjackButtonsBaseGame(self)
         
     def get_base_menu_string(self):
         if self.game.game_state == 1:

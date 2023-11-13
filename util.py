@@ -24,19 +24,21 @@ class Card:
         return str(self.suit) + str(self.face)
     
 class Deck:
-    def __init__(self, suits, faces, specials):
+    def __init__(self, suits, faces, count, specials):
         """
         Normal cards: Encompasses every possible suit, face combo as
-        specified by the suits and faces collection.
+        specified by the suits and faces collection. Count determines
+        how many of each normal card appears in a standard deck.
 
         Special cards: Unique cards. Use "specials" argument to pass in
         2-value tuples, the first value containing the "special" card,
         the second containing the number of this card per deck.
         """
         self.cards = {}
-        self.deck_size = len(suits) * len(faces)
+        self.single_deck_size = len(suits) * len(faces) * count
         for (i, j) in specials:
-            
+            self.single_deck_size += j
+        
 
 
 def generate_deck():
