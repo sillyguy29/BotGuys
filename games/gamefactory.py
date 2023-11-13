@@ -2,6 +2,7 @@
 """
 from games.counter import CounterManager
 from games.blackjack import BlackjackManager
+from games.uno import UnoManager
 
 
 class GameFactory():
@@ -37,11 +38,16 @@ class GameFactory():
                                          players, cpus)
             self.active_games[interaction.channel_id] = new_game
             await new_game.create_game(interaction)
+            
+        if game_type == 3:
+            new_game = UnoManager(self, interaction.channel_id, interaction.user)
+            self.active_games[interaction.channel_id] = new_game
+            await new_game.create_game(interaction)
 
         else:
             raise ValueError("Unrecognized game type")
 
-        await new_game.create_game(interaction)
+        #await new_game.create_game(interaction)
 
 
     async def stop_game(self, channel_id):

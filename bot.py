@@ -51,6 +51,15 @@ def create_commands(client):
     async def play_blackjack(interaction: discord.Interaction, players: int, cpus: int):
         print(f"{interaction.user} is starting a game with {players} human players and {cpus} computer players!")
         await client.game_factory.start_game(interaction, 1, players, cpus)
+        
+    @client.tree.command(name="uno", description="Play a game of Uno")
+    @discord.app_commands.describe(
+        players="Amount of human players (max of 6)",
+        cpus="Amount of cpu players (max of 3)"
+    )
+    async def play_uno(interaction: discord.Interaction, players: int, cpus: int):
+        print(f"{interaction.user} is starting a game with {players} human players and {cpus} computer players!")
+        await client.game_factory.start_game(interaction, 3, players, cpus)
 
 
 def run_bot():
