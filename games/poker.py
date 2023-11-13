@@ -135,7 +135,20 @@ class PokerButtonsBaseGame(discord.ui.View):
         await self.manager.resend(interaction)
 
 
-
+def encode_hand_value(hand_tuple):
+    """
+    hand_tuple is the tuple of values corresponding to the value of a hand
+    along with any values necessary for breaking ties
+    Returns an integer that can be used for comparing hands
+    """
+    # This uses powers of 13 because there are 13 possible card faces
+    # Essentially encodes the values as a base 13 number
+    # This should make comparing more than 2 hands at a time easier
+    # Also avoids the creation of a new data type
+    return_value = hand_tuple[0] * (13**5)
+    for index in range(1, len(hand_tuple)):
+        return_value += hand_tuple[index] * (13 ** (5-index))
+    return return_value
 
 def max_hand(hand):
     """
@@ -143,6 +156,7 @@ def max_hand(hand):
     along with information necessary for breaking ties
     hand: list of 5 Card objects
     """
+    #TODO: Does not support ace as a 1 in a straight
     lookup = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J","Q", "K", "A"]
     if len(hand) != 5:
         raise ValueError("Hand must contain 5 cards")
@@ -157,7 +171,7 @@ def max_hand(hand):
     #Check Royal Flush
     if same_suit:
         if hand[0].face == "10" and hand[1].face == "J" and hand[2].face == "Q" and hand[3].face == "K" and hand[4].face == "A":
-            return (10, highest_value)
+            return encode_hand_value((10, highest_value))
     
     #Check Straight Flush
     if same_suit:
@@ -167,7 +181,7 @@ def max_hand(hand):
                 is_straight = False
                 break
         if is_straight:
-            return (9, highest_value)
+            return encode_hand_value((9, highest_value))
     
     num_same = 0
     type_dict = dict()
@@ -179,14 +193,14 @@ def max_hand(hand):
         if type_dict[key] == 4:
             for key2 in type_dict:
                 if key2 != key:
-                    return (8, lookup.index(key), lookup.index(key2))
+                    return encode_hand_value((8, lookup.index(key), lookup.index(key2)))
         
     #Check Full House
     for key in type_dict:
         if type_dict[key] == 3:
             for key2 in type_dict:
                 if type_dict[key2] == 2:
-                    return (7, lookup.index(key), lookup.index(key2))
+                    return encode_hand_value((7, lookup.index(key), lookup.index(key2)))
                 
     #Check Flush
     if same_suit:
@@ -208,7 +222,7 @@ def max_hand(hand):
                 if key2 != key:
                     for key3 in type_dict:
                         if key3 != key and key3 != key2:
-                            return (4, lookup.index(key), lookup.index(key2), lookup.index(key3))
+                            return encode_hand_value((4, lookup.index(key), lookup.index(key2), lookup.index(key3)))
     
     #Check Two Pair
     num_pairs = 0
@@ -223,7 +237,7 @@ def max_hand(hand):
                 pair_values.append(lookup.index(key))
             else:
                 kicker = lookup.index(key)
-        return (3, ) + tuple(sorted(pair_values, reverse = True)) + (kicker, )
+        return encode_hand_value((3, ) + tuple(sorted(pair_values, reverse = True)) + (kicker, ))
     
     #Check One Pair
     if num_pairs == 1:
@@ -234,10 +248,10 @@ def max_hand(hand):
                 pair_value = lookup.index(key)
             else:
                 kicker_values.append(lookup.index(key))
-        return (2, pair_value) + tuple(sorted(kicker_values, reverse = True))
+        return encode_hand_value((2, pair_value) + tuple(sorted(kicker_values, reverse = True)))
     
     #No good hand, must use high card
-    return (1, ) + tuple(sorted([lookup.index(c.face) for c in hand], reverse = True))
+    return encode_hand_value((1, ) + tuple(sorted([lookup.index(c.face) for c in hand], reverse = True)))
 
 def compare_hands(hand1, hand2):
     """
@@ -246,9 +260,8 @@ def compare_hands(hand1, hand2):
     """
     hand1_value = max_hand(hand1)
     hand2_value = max_hand(hand2)
-    for index in range(len(hand1_value)):
-        if hand1_value[index] > hand2_value[index]:
-            return 1
-        elif hand1_value[index] < hand2_value[index]:
-            return 2
+    if hand1_value > hand2_value:
+        return 1
+    elif hand1_value < hand2_value:
+        return 2
     return 0
