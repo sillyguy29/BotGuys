@@ -156,8 +156,8 @@ def max_hand(hand):
     along with information necessary for breaking ties
     hand: list of 5 Card objects
     """
-    #TODO: Does not support ace as a 1 in a straight
     lookup = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J","Q", "K", "A"]
+    alt_lookup = ["A"] + lookup[:12] #Used in checking Straight Flush and Straights for A=1
     if len(hand) != 5:
         raise ValueError("Hand must contain 5 cards")
     hand.sort(key = lambda x: lookup.index(x.face))
@@ -175,9 +175,10 @@ def max_hand(hand):
     
     #Check Straight Flush
     if same_suit:
+        #Straight Flush uses alt_lookup because if it is not a Royal Flush, A=1 if it is a Flush
         is_straight = True
         for index in range(4):
-            if lookup.index(hand[index].face) + 1 != lookup.index(hand[index + 1].face):
+            if lookup.index(hand[index].face) + 1 != alt_lookup.index(hand[index + 1].face):
                 is_straight = False
                 break
         if is_straight:
@@ -207,13 +208,22 @@ def max_hand(hand):
         return (6, ) + tuple(sorted([lookup.index(c.face) for c in hand], reverse = True))
     
     #Check Straight
+    is_high_straight = True
     for index in range(4):
-        is_straight = True
         if lookup.index(hand[index].face) + 1 != lookup.index(hand[index + 1].face):
-            is_straight = False
+            is_high_straight = False
             break
-    if is_straight:
-        return (5, highest_value)
+    is_low_straight = True
+    for index in range(4):
+        if alt_lookup.index(hand[index].face) + 1 != alt_lookup.index(hand[index + 1].face):
+            is_low_straight = False
+            break
+    if is_high_straight:
+        return encode_hand_value((5, highest_value))
+    elif is_low_straight:
+        # We use '3' here because if it is a low straight, A=1 and the highest value card
+        # is 5 (A,2,3,4,5), which is 3 in the lookup list
+        return encode_hand_value((5, 3))
     
     #Check Three of a Kind
     for key in type_dict:
