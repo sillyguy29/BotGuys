@@ -7,19 +7,28 @@ with the game at any time, and there is player management.
 import discord
 from games.game import BaseGame
 from games.game import GameManager
+from games.game import BasePlayer
 from util import Card
 from util import generate_deck
 import random
+
+class BlackjackPlayer(BasePlayer):
+    def __init__(self, hand=[], chips=300):
+        super.__init__()
+
+        self.hand = hand
+        self.chips = chips
 
 
 class BlackjackGame(BaseGame):
     """
     Blackjack game model class. Keeps track of the deck and none else
     """
-    def __init__(self):
+    def __init__(self, turn_order=[]):
         # game state 1 -> accepting players but not playing yet
         super().__init__(game_type=1, player_data={}, game_state=1)
-        
+
+        self.turn_order = turn_order
         self.deck = generate_deck()
         self.dealer_hand = []
         random.shuffle(self.deck)
@@ -29,11 +38,8 @@ class BlackjackGame(BaseGame):
         
 class BlackjackManager(GameManager):
     def __init__(self, factory, channel_id, user_id):
-        super().__init__(BlackjackGame(), BlackjackButtonsBase(self),
-                         channel_id, factory)
-        
-        # What is player_list? We have player_data (dict) in the game model
-        self.game.player_list.append(user_id)
+        super().__init__(game=BlackjackGame(), base_gui=BlackjackButtonsBase(self),
+                         channel_id=channel_id, factory=factory)
 
     async def create_game(self, interaction):
         raise NotImplementedError("Override this method based on blackjack specifications")
@@ -41,13 +47,13 @@ class BlackjackManager(GameManager):
     async def start_game(self, interaction):
         # game_state == 4 -> players cannot join or leave
         self.game.game_state = 4
-        await self.gameplay_loop()
         
     def get_base_menu_string(self):
         if self.game.game_state == 1:
             return "Welcome to this game of Blackjack. Feel free to join."
         elif self.game.game_state == 4:
             return "Game has started, placeholder string"
+        return "You shouldn't be seeing this."
 
     async def hit_user(self, interaction):
         """
@@ -58,8 +64,8 @@ class BlackjackManager(GameManager):
             return
         
         # add a card to the user's hand
-        c = self.game.deck.pop()
-        self.game.player_data[interaction.user]["hand"].append(c)
+        card = self.game.deck.pop()
+        self.game.player_data[interaction.user]["hand"].append(card)
         
         # resend the base menu with the updated game state
         await self.resend(interaction)
@@ -76,13 +82,6 @@ class BlackjackManager(GameManager):
         
         # resend the base menu with the updated game state
         await self.resend(interaction)
-
-        
-    async def remove_all_players(self):
-        """
-        Removes all players from the players list
-        """
-        await self.factory.remove_players(self.game.player_list)
 
     async def gameplay_loop(self):
         """
@@ -141,18 +140,9 @@ class BlackjackButtonsBase(discord.ui.View):
         # print when someone presses the button because otherwise
         # pylint won't shut up about button being unused
         print(f"{interaction.user} pressed {button.label}!")
-        # TODO: the second arg should contain a class or data structure that contains
-        # all the data needed for a player in this game
-        if self.manager.game.is_accepting_players():
-            indi_player_data = dict()
-            indi_player_data["hand"] = []
-            indi_player_data["chips"] = 0
-            #player turn order determined by the order in which players join
-            indi_player_data["turn"] = self.manager.game.players
-            await self.manager.add_player(interaction, indi_player_data)
-        else:
-            await interaction.response.send_message("This game is not currently accepting players.",
-                                                     ephemeral = True, delete_after = 10)
+
+        indi_player_data = BlackjackPlayer(hand=[], chips=300)
+        await self.manager.add_player(interaction, indi_player_data)
     
     @discord.ui.button(label = "Quit", style = discord.ButtonStyle.red)
     async def quit(self, interaction: discord.Interaction, button: discord.ui.Button):

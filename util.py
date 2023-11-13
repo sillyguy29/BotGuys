@@ -1,4 +1,6 @@
 
+
+
 class Card:
     """
     This data type represents the playing cards found in a standard
@@ -20,6 +22,21 @@ class Card:
     
     def __str__(self):
         return str(self.suit) + str(self.face)
+    
+class Deck:
+    def __init__(self, suits, faces, specials):
+        """
+        Normal cards: Encompasses every possible suit, face combo as
+        specified by the suits and faces collection.
+
+        Special cards: Unique cards. Use "specials" argument to pass in
+        2-value tuples, the first value containing the "special" card,
+        the second containing the number of this card per deck.
+        """
+        self.cards = {}
+        self.deck_size = len(suits) * len(faces)
+        for (i, j) in specials:
+            
 
 
 def generate_deck():
