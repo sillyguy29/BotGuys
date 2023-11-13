@@ -162,3 +162,4 @@ cython_debug/
 #ignore the file with the bot's token, and the guild id
 bot_token.txt
 guild_id.txt
+*.json
