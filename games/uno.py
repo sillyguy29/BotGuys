@@ -1,3 +1,9 @@
+"""Uno game module
+
+Contains all the logic needed to run a game of Uno.
+It features an closed game model, meaning not all users can interact
+with the game at any time, and there is player management.
+"""
 import discord
 from games.game import BaseGame
 from games.game import GameManager

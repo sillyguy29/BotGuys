@@ -39,7 +39,7 @@ class GameFactory():
             self.active_games[interaction.channel_id] = new_game
             await new_game.create_game(interaction)
             
-        if game_type == 3:
+        elif game_type == 3:
             new_game = UnoManager(self, interaction.channel_id, interaction.user)
             self.active_games[interaction.channel_id] = new_game
             await new_game.create_game(interaction)
