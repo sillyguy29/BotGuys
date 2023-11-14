@@ -7,47 +7,79 @@ with the game at any time, and there is player management.
 import discord
 from games.game import BaseGame
 from games.game import GameManager
+from games.game import BasePlayer
 from util import Card
-from util import generate_deck
+from util import STANDARD_52_DECK
+from util import cards_to_str_52_standard
 import random
+
+
+class BlackjackPlayer(BasePlayer):
+    def __init__(self):
+        super().__init__()
+
+        self.hand = []
+        self.chips = 300
 
 
 class BlackjackGame(BaseGame):
     """
     Blackjack game model class. Keeps track of the deck and none else
     """
-    def __init__(self):
+    def __init__(self, cpus):
         # game state 1 -> accepting players but not playing yet
-        super().__init__(game_type=1, player_data={}, game_state=1)
-        
-        self.deck = generate_deck()
+        super().__init__(game_type=1, player_data={}, game_state=1, cpus=cpus)
+
+        self.turn_order = []
         self.dealer_hand = []
-        random.shuffle(self.deck)
 
     #def __repr__(self):
  
         
 class BlackjackManager(GameManager):
-    def __init__(self, factory, channel_id, user_id):
-        super().__init__(BlackjackGame(), BlackjackButtonsBase(self),
-                         channel_id, factory)
-        
-        # What is player_list? We have player_data (dict) in the game model
-        self.game.player_list.append(user_id)
+    def __init__(self, factory, channel_id, cpus):
+        super().__init__(game=BlackjackGame(cpus), base_gui=BlackjackButtonsBase(self),
+                         channel_id=channel_id, factory=factory)
 
-    async def create_game(self, interaction):
-        raise NotImplementedError("Override this method based on blackjack specifications")
-    
+    async def add_player(self, interaction, init_player_data=None):
+        await super().add_player(interaction, init_player_data)
+        if interaction.user in self.game.player_data \
+        and interaction.user not in self.game.turn_order:
+            self.game.turn_order.append(interaction.user)
+
+    async def remove_player(self, interaction):
+        await super().remove_player(interaction)
+        if interaction.user not in self.game.player_data \
+        and interaction.user in self.game.turn_order:
+            self.game.turn_order.remove(interaction.user)
+        # if nobody else is left, then quit the game
+        if self.game.players == 0:
+            await self.quit_game(interaction)
+
     async def start_game(self, interaction):
+        if self.game.game_state == 4:
+            interaction.response.send_message("This game has already started.",
+                                              ephemeral = True, delete_after = 10)
+            return
         # game_state == 4 -> players cannot join or leave
         self.game.game_state = 4
-        await self.gameplay_loop()
-        
+        # swap default GUI to active game buttons
+        self.base_gui = BlackjackButtonsBaseGame(self)
+        # draw 2 cards for the dealer and every player
+        self.game.dealer_hand.extend(STANDARD_52_DECK.draw(2))
+        for i in self.game.player_data:
+            self.game.player_data[i].hand.extend(STANDARD_52_DECK.draw(2))
+        await self.resend(interaction)
+
     def get_base_menu_string(self):
         if self.game.game_state == 1:
             return "Welcome to this game of Blackjack. Feel free to join."
         elif self.game.game_state == 4:
-            return "Game has started, placeholder string"
+            ret = f"Dealer hand: {cards_to_str_52_standard(self.game.dealer_hand)}\n"
+            for player in self.game.turn_order:
+                ret += f"{player}: {cards_to_str_52_standard(self.game.player_data[player].hand)}\n"
+            return ret
+        return "You shouldn't be seeing this."
 
     async def hit_user(self, interaction):
         """
@@ -58,8 +90,8 @@ class BlackjackManager(GameManager):
             return
         
         # add a card to the user's hand
-        c = self.game.deck.pop()
-        self.game.player_data[interaction.user]["hand"].append(c)
+        card = self.game.deck.pop()
+        self.game.player_data[interaction.user]["hand"].append(card)
         
         # resend the base menu with the updated game state
         await self.resend(interaction)
@@ -76,13 +108,6 @@ class BlackjackManager(GameManager):
         
         # resend the base menu with the updated game state
         await self.resend(interaction)
-
-        
-    async def remove_all_players(self):
-        """
-        Removes all players from the players list
-        """
-        await self.factory.remove_players(self.game.player_list)
 
     async def gameplay_loop(self):
         """
@@ -141,18 +166,9 @@ class BlackjackButtonsBase(discord.ui.View):
         # print when someone presses the button because otherwise
         # pylint won't shut up about button being unused
         print(f"{interaction.user} pressed {button.label}!")
-        # TODO: the second arg should contain a class or data structure that contains
-        # all the data needed for a player in this game
-        if self.manager.game.is_accepting_players():
-            indi_player_data = dict()
-            indi_player_data["hand"] = []
-            indi_player_data["chips"] = 0
-            #player turn order determined by the order in which players join
-            indi_player_data["turn"] = self.manager.game.players
-            await self.manager.add_player(interaction, indi_player_data)
-        else:
-            await interaction.response.send_message("This game is not currently accepting players.",
-                                                     ephemeral = True, delete_after = 10)
+
+        indi_player_data = BlackjackPlayer()
+        await self.manager.add_player(interaction, indi_player_data)
     
     @discord.ui.button(label = "Quit", style = discord.ButtonStyle.red)
     async def quit(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -163,10 +179,7 @@ class BlackjackButtonsBase(discord.ui.View):
         # pylint won't shut up about button being unused
         print(f"{interaction.user} pressed {button.label}!")
         # remove current players from active player list
-        self.manager.remove_player(interaction)
-        # if nobody else is left, then quit the game
-        if self.game.players == 0:
-            await self.manager.quit_game(interaction)
+        await self.manager.remove_player(interaction)
 
     @discord.ui.button(label = "Start game", style = discord.ButtonStyle.blurple)
     async def start(self, interaction: discord.Interaction, button: discord.ui.Button):
