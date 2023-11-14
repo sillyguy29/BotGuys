@@ -7,10 +7,17 @@ with the game at any time, and there is player management.
 import discord
 from games.game import BaseGame
 from games.game import GameManager
+from games.game import BasePlayer
 from util import Card
 from util import generate_deck
 import random
 
+class PokerPlayer(BasePlayer):
+    def __init__(self):
+        super().__init__()
+        self.hand = []
+        self.chips = 0
+        self.bet = 0
 
 class PokerGame(BaseGame):
     """
@@ -178,7 +185,7 @@ def max_hand(hand):
         #Straight Flush uses alt_lookup because if it is not a Royal Flush, A=1 if it is a Flush
         is_straight = True
         for index in range(4):
-            if lookup.index(hand[index].face) + 1 != alt_lookup.index(hand[index + 1].face):
+            if alt_lookup.index(hand[index].face) + 1 != alt_lookup.index(hand[index + 1].face):
                 is_straight = False
                 break
         if is_straight:
@@ -205,7 +212,7 @@ def max_hand(hand):
                 
     #Check Flush
     if same_suit:
-        return (6, ) + tuple(sorted([lookup.index(c.face) for c in hand], reverse = True))
+        return encode_hand_value((6, ) + tuple(sorted([lookup.index(c.face) for c in hand], reverse = True)))
     
     #Check Straight
     is_high_straight = True
