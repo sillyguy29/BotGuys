@@ -1,16 +1,25 @@
 """Poker game module
 
-Contains all the logic needed to run a game of Poker.
+Contains all the logic needed to run a game of Texas Hold'em Poker.
 It features an closed game model, meaning not all users can interact
 with the game at any time, and there is player management.
 """
 import discord
 from games.game import BaseGame
 from games.game import GameManager
+from games.game import BasePlayer
 from util import Card
 from util import generate_deck
 import random
 
+class PokerPlayer(BasePlayer):
+    def __init__(self, is_cpu=False):
+        super().__init__()
+        self.hand = []
+        self.chips = 0
+        self.bet = 0
+        self.is_cpu = is_cpu
+        self.active = True #Inactive when they fold
 
 class PokerGame(BaseGame):
     """
@@ -62,8 +71,6 @@ class PokerManager(GameManager):
         """
         pass
 
-
-
      
 class PokerButtonsBase(discord.ui.View):
     def __init__(self, manager):
@@ -85,8 +92,7 @@ class PokerButtonsBase(discord.ui.View):
         # TODO: the second arg should contain a class or data structure that contains
         # all the data needed for a player in this game
         if self.manager.game.is_accepting_players():
-            indi_player_data = dict() 
-            #TODO Use new Player class instead of dict here!!!!!!!!!!!!!!!
+            indi_player_data = PokerPlayer()
             await self.manager.add_player(interaction, indi_player_data)
         else:
             await interaction.response.send_message("This game is not currently accepting players.",
@@ -134,6 +140,103 @@ class PokerButtonsBaseGame(discord.ui.View):
         # resend
         await self.manager.resend(interaction)
 
+class ViewHand(discord.ui.View):
+    """
+    Button group that just shows "View Hand" button
+    View Hand should send ephemeral message of the user's hand
+    """
+    def __init__(self, manager):
+        super().__init__()
+        self.manager = manager
+
+    @discord.ui.button(label = "View Hand", style = discord.ButtonStyle.green)
+    async def hit_me(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        Let the user view their hand
+        """
+        print(f"{interaction.user} pressed {button.label}!")
+        # stop accepting interactions for this message
+        self.stop()
+        # send the user their hand
+        current_player = self.manager.game.player_data[interaction.user]
+        if len(current_player.hand) != 2:
+            raise ValueError("Player hand must contain 2 cards")
+        await interaction.response.send_message(f"Your hand is {str(current_player.hand[0])} and {str(current_player.hand[1])}", ephemeral = True, delete_after = 60)
+
+class DecideBet(discord.ui.View):
+    """
+    Button group to decide value of bet
+    Should be 5 buttons: +10, +1, -1, -10, and Done
+    """
+    def __init__(self, manager, min_bet = 0):
+        super().__init__()
+        self.manager = manager
+        self.bet = 0
+        self.min_bet = min_bet
+
+    @discord.ui.button(label = "+10", style = discord.ButtonStyle.green)
+    async def plus_10(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        Raise bet by 10
+        """
+        print(f"{interaction.user} pressed {button.label}!")
+        # stop accepting interactions for this message
+        self.stop()
+        #TODO: raise bet by 10, should edit a message that shows the current bet
+        #TODO: add +1, -1, -10 buttons with very similar code.
+        if self.bet + 10 <= self.manager.game.player_data[interaction.user].chips:
+            self.bet += 10
+
+    @discord.ui.button(label = "Done", style = discord.ButtonStyle.blurple)
+    async def enter_bet(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        Enter bet
+        """
+        print(f"{interaction.user} pressed {button.label}!")
+        # stop accepting interactions for this message
+        self.stop()
+        #TODO: enter bet, should move on to next person after bet is made
+
+class StandardTurnButtons(discord.ui.View):
+    """
+    Button group for the options to Call, Raise, or Fold
+    """
+    def __init__(self, manager):
+        super().__init__()
+        self.manager = manager
+
+    @discord.ui.button(label = "Call", style = discord.ButtonStyle.gray)
+    async def call(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        Call
+        """
+        print(f"{interaction.user} pressed {button.label}!")
+        # stop accepting interactions for this message
+        self.stop()
+        # User bets the amount needed to match the current bet
+        #TODO: What if the user doesn't have enough chips to call?
+
+    @discord.ui.button(label = "Raise", style = discord.ButtonStyle.green)
+    async def raise_bet(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        Raise
+        """
+        print(f"{interaction.user} pressed {button.label}!")
+        # stop accepting interactions for this message
+        self.stop()
+        #TODO: Ask the user to make a bet
+
+    @discord.ui.button(label = "Fold", style = discord.ButtonStyle.red)
+    async def fold(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        Fold
+        """
+        print(f"{interaction.user} pressed {button.label}!")
+        # stop accepting interactions for this message
+        self.stop()
+        #TODO: Fold stuff
+
+
 
 def encode_hand_value(hand_tuple):
     """
@@ -156,8 +259,8 @@ def max_hand(hand):
     along with information necessary for breaking ties
     hand: list of 5 Card objects
     """
-    #TODO: Does not support ace as a 1 in a straight
-    lookup = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J","Q", "K", "A"]
+    lookup = ("2", "3", "4", "5", "6", "7", "8", "9", "10", "J","Q", "K", "A")
+    alt_lookup = ("A",) + lookup[:12] #Used in checking Straight Flush and Straights for A=1
     if len(hand) != 5:
         raise ValueError("Hand must contain 5 cards")
     hand.sort(key = lambda x: lookup.index(x.face))
@@ -175,9 +278,10 @@ def max_hand(hand):
     
     #Check Straight Flush
     if same_suit:
+        #Straight Flush uses alt_lookup because if it is not a Royal Flush, A=1 if it is a Flush
         is_straight = True
         for index in range(4):
-            if lookup.index(hand[index].face) + 1 != lookup.index(hand[index + 1].face):
+            if alt_lookup.index(hand[index].face) + 1 != alt_lookup.index(hand[index + 1].face):
                 is_straight = False
                 break
         if is_straight:
@@ -204,16 +308,25 @@ def max_hand(hand):
                 
     #Check Flush
     if same_suit:
-        return (6, ) + tuple(sorted([lookup.index(c.face) for c in hand], reverse = True))
+        return encode_hand_value((6, ) + tuple(sorted([lookup.index(c.face) for c in hand], reverse = True)))
     
     #Check Straight
+    is_high_straight = True
     for index in range(4):
-        is_straight = True
         if lookup.index(hand[index].face) + 1 != lookup.index(hand[index + 1].face):
-            is_straight = False
+            is_high_straight = False
             break
-    if is_straight:
-        return (5, highest_value)
+    is_low_straight = True
+    for index in range(4):
+        if alt_lookup.index(hand[index].face) + 1 != alt_lookup.index(hand[index + 1].face):
+            is_low_straight = False
+            break
+    if is_high_straight:
+        return encode_hand_value((5, highest_value))
+    elif is_low_straight:
+        # We use '3' here because if it is a low straight, A=1 and the highest value card
+        # is 5 (A,2,3,4,5), which is 3 in the primary lookup list [2,3,4,5,...,A]
+        return encode_hand_value((5, 3))
     
     #Check Three of a Kind
     for key in type_dict:
