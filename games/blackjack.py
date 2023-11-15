@@ -186,7 +186,7 @@ class BlackjackButtonsBase(discord.ui.View):
         # remove current players from active player list
         await self.manager.remove_player(interaction)
 
-    @discord.ui.button(label = "Start game", style = discord.ButtonStyle.blurple)
+    @discord.ui.button(label = "Start Game", style = discord.ButtonStyle.blurple)
     async def start(self, interaction: discord.Interaction, button: discord.ui.Button):
         """
         Start the game

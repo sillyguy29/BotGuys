@@ -1,16 +1,26 @@
 """Poker game module
 
-Contains all the logic needed to run a game of Poker.
+Contains all the logic needed to run a game of Texas Hold'em Poker.
 It features an closed game model, meaning not all users can interact
 with the game at any time, and there is player management.
 """
 import discord
 from games.game import BaseGame
 from games.game import GameManager
+from games.game import BasePlayer
 from util import Card
 from util import generate_deck
 import random
+from itertools import combinations
 
+class PokerPlayer(BasePlayer):
+    def __init__(self, is_cpu=False):
+        super().__init__()
+        self.hand = []
+        self.chips = 0
+        self.bet = 0
+        self.is_cpu = is_cpu
+        self.active = True #Inactive when they fold
 
 class PokerGame(BaseGame):
     """
@@ -62,8 +72,6 @@ class PokerManager(GameManager):
         """
         pass
 
-
-
      
 class PokerButtonsBase(discord.ui.View):
     def __init__(self, manager):
@@ -85,8 +93,7 @@ class PokerButtonsBase(discord.ui.View):
         # TODO: the second arg should contain a class or data structure that contains
         # all the data needed for a player in this game
         if self.manager.game.is_accepting_players():
-            indi_player_data = dict() 
-            #TODO Use new Player class instead of dict here!!!!!!!!!!!!!!!
+            indi_player_data = PokerPlayer()
             await self.manager.add_player(interaction, indi_player_data)
         else:
             await interaction.response.send_message("This game is not currently accepting players.",
@@ -134,8 +141,118 @@ class PokerButtonsBaseGame(discord.ui.View):
         # resend
         await self.manager.resend(interaction)
 
+class ViewHand(discord.ui.View):
+    """
+    Button group that just shows "View Hand" button
+    View Hand should send ephemeral message of the user's hand
+    """
+    def __init__(self, manager):
+        super().__init__()
+        self.manager = manager
+
+    @discord.ui.button(label = "View Hand", style = discord.ButtonStyle.green)
+    async def hit_me(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        Let the user view their hand
+        """
+        print(f"{interaction.user} pressed {button.label}!")
+        # stop accepting interactions for this message
+        self.stop()
+        # send the user their hand
+        current_player = self.manager.game.player_data[interaction.user]
+        if len(current_player.hand) != 2:
+            raise ValueError("Player hand must contain 2 cards")
+        await interaction.response.send_message(f"Your hand is {str(current_player.hand[0])} and {str(current_player.hand[1])}", ephemeral = True, delete_after = 60)
+
+class DecideBet(discord.ui.View):
+    """
+    Button group to decide value of bet
+    Should be 5 buttons: +10, +1, -1, -10, and Done
+    """
+    def __init__(self, manager, min_bet = 0):
+        super().__init__()
+        self.manager = manager
+        self.bet = 0
+        self.min_bet = min_bet
+
+    @discord.ui.button(label = "+10", style = discord.ButtonStyle.green)
+    async def plus_10(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        Raise bet by 10
+        """
+        print(f"{interaction.user} pressed {button.label}!")
+        # stop accepting interactions for this message
+        self.stop()
+        #TODO: raise bet by 10, should edit a message that shows the current bet
+        #TODO: add +1, -1, -10 buttons with very similar code.
+        if self.bet + 10 <= self.manager.game.player_data[interaction.user].chips:
+            self.bet += 10
+
+    @discord.ui.button(label = "Done", style = discord.ButtonStyle.blurple)
+    async def enter_bet(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        Enter bet
+        """
+        print(f"{interaction.user} pressed {button.label}!")
+        # stop accepting interactions for this message
+        self.stop()
+        #TODO: enter bet, should move on to next person after bet is made
+
+class StandardTurnButtons(discord.ui.View):
+    """
+    Button group for the options to Call, Raise, or Fold
+    """
+    def __init__(self, manager):
+        super().__init__()
+        self.manager = manager
+
+    @discord.ui.button(label = "Call", style = discord.ButtonStyle.gray)
+    async def call(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        Call
+        """
+        print(f"{interaction.user} pressed {button.label}!")
+        # stop accepting interactions for this message
+        self.stop()
+        # User bets the amount needed to match the current bet
+        #TODO: What if the user doesn't have enough chips to call?
+
+    @discord.ui.button(label = "Raise", style = discord.ButtonStyle.green)
+    async def raise_bet(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        Raise
+        """
+        print(f"{interaction.user} pressed {button.label}!")
+        # stop accepting interactions for this message
+        self.stop()
+        #TODO: Ask the user to make a bet
+
+    @discord.ui.button(label = "Fold", style = discord.ButtonStyle.red)
+    async def fold(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        Fold
+        """
+        print(f"{interaction.user} pressed {button.label}!")
+        # stop accepting interactions for this message
+        self.stop()
+        #TODO: Fold stuff
 
 
+
+def encode_hand_value(hand_tuple):
+    """
+    hand_tuple is the tuple of values corresponding to the value of a hand
+    along with any values necessary for breaking ties
+    Returns an integer that can be used for comparing hands
+    """
+    # This uses powers of 13 because there are 13 possible card faces
+    # Essentially encodes the values as a base 13 number
+    # This should make comparing more than 2 hands at a time easier
+    # Also avoids the creation of a new data type
+    return_value = hand_tuple[0] * (13**5)
+    for index in range(1, len(hand_tuple)):
+        return_value += hand_tuple[index] * (13 ** (5-index))
+    return return_value
 
 def max_hand(hand):
     """
@@ -143,7 +260,8 @@ def max_hand(hand):
     along with information necessary for breaking ties
     hand: list of 5 Card objects
     """
-    lookup = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J","Q", "K", "A"]
+    lookup = ("2", "3", "4", "5", "6", "7", "8", "9", "10", "J","Q", "K", "A")
+    alt_lookup = ("A",) + lookup[:12] #Used in checking Straight Flush and Straights for A=1
     if len(hand) != 5:
         raise ValueError("Hand must contain 5 cards")
     hand.sort(key = lambda x: lookup.index(x.face))
@@ -157,17 +275,18 @@ def max_hand(hand):
     #Check Royal Flush
     if same_suit:
         if hand[0].face == "10" and hand[1].face == "J" and hand[2].face == "Q" and hand[3].face == "K" and hand[4].face == "A":
-            return (10, highest_value)
+            return encode_hand_value((10, highest_value))
     
     #Check Straight Flush
     if same_suit:
+        #Straight Flush uses alt_lookup because if it is not a Royal Flush, A=1 if it is a Flush
         is_straight = True
         for index in range(4):
-            if lookup.index(hand[index].face) + 1 != lookup.index(hand[index + 1].face):
+            if alt_lookup.index(hand[index].face) + 1 != alt_lookup.index(hand[index + 1].face):
                 is_straight = False
                 break
         if is_straight:
-            return (9, highest_value)
+            return encode_hand_value((9, highest_value))
     
     num_same = 0
     type_dict = dict()
@@ -179,27 +298,36 @@ def max_hand(hand):
         if type_dict[key] == 4:
             for key2 in type_dict:
                 if key2 != key:
-                    return (8, lookup.index(key), lookup.index(key2))
+                    return encode_hand_value((8, lookup.index(key), lookup.index(key2)))
         
     #Check Full House
     for key in type_dict:
         if type_dict[key] == 3:
             for key2 in type_dict:
                 if type_dict[key2] == 2:
-                    return (7, lookup.index(key), lookup.index(key2))
+                    return encode_hand_value((7, lookup.index(key), lookup.index(key2)))
                 
     #Check Flush
     if same_suit:
-        return (6, ) + tuple(sorted([lookup.index(c.face) for c in hand], reverse = True))
+        return encode_hand_value((6, ) + tuple(sorted([lookup.index(c.face) for c in hand], reverse = True)))
     
     #Check Straight
+    is_high_straight = True
     for index in range(4):
-        is_straight = True
         if lookup.index(hand[index].face) + 1 != lookup.index(hand[index + 1].face):
-            is_straight = False
+            is_high_straight = False
             break
-    if is_straight:
-        return (5, highest_value)
+    is_low_straight = True
+    for index in range(4):
+        if alt_lookup.index(hand[index].face) + 1 != alt_lookup.index(hand[index + 1].face):
+            is_low_straight = False
+            break
+    if is_high_straight:
+        return encode_hand_value((5, highest_value))
+    elif is_low_straight:
+        # We use '3' here because if it is a low straight, A=1 and the highest value card
+        # is 5 (A,2,3,4,5), which is 3 in the primary lookup list [2,3,4,5,...,A]
+        return encode_hand_value((5, 3))
     
     #Check Three of a Kind
     for key in type_dict:
@@ -208,7 +336,7 @@ def max_hand(hand):
                 if key2 != key:
                     for key3 in type_dict:
                         if key3 != key and key3 != key2:
-                            return (4, lookup.index(key), lookup.index(key2), lookup.index(key3))
+                            return encode_hand_value((4, lookup.index(key), lookup.index(key2), lookup.index(key3)))
     
     #Check Two Pair
     num_pairs = 0
@@ -223,7 +351,7 @@ def max_hand(hand):
                 pair_values.append(lookup.index(key))
             else:
                 kicker = lookup.index(key)
-        return (3, ) + tuple(sorted(pair_values, reverse = True)) + (kicker, )
+        return encode_hand_value((3, ) + tuple(sorted(pair_values, reverse = True)) + (kicker, ))
     
     #Check One Pair
     if num_pairs == 1:
@@ -234,10 +362,10 @@ def max_hand(hand):
                 pair_value = lookup.index(key)
             else:
                 kicker_values.append(lookup.index(key))
-        return (2, pair_value) + tuple(sorted(kicker_values, reverse = True))
+        return encode_hand_value((2, pair_value) + tuple(sorted(kicker_values, reverse = True)))
     
     #No good hand, must use high card
-    return (1, ) + tuple(sorted([lookup.index(c.face) for c in hand], reverse = True))
+    return encode_hand_value((1, ) + tuple(sorted([lookup.index(c.face) for c in hand], reverse = True)))
 
 def compare_hands(hand1, hand2):
     """
@@ -246,9 +374,28 @@ def compare_hands(hand1, hand2):
     """
     hand1_value = max_hand(hand1)
     hand2_value = max_hand(hand2)
-    for index in range(len(hand1_value)):
-        if hand1_value[index] > hand2_value[index]:
-            return 1
-        elif hand1_value[index] < hand2_value[index]:
-            return 2
+    if hand1_value > hand2_value:
+        return 1
+    elif hand1_value < hand2_value:
+        return 2
     return 0
+
+def best_hand(user_hand, table):
+    """
+    This finds the best value using 0-2 of the user_hand
+    and 3-5 of the table cards.
+    """
+    if len(user_hand) != 2:
+        raise ValueError("User hand must contain 2 cards")
+    if len(table) > 5 or len(table) < 3:
+        raise ValueError("Table must contain 3-5 cards")
+    
+    #During the flop, the card combination is 5 choose 5, so one possible hand per-person
+    #During the turn, the card combination is 6 choose 5, so 6 possible hands per-person
+    #During the river, the card combination is 7 choose 5, so 21 possible hands per-person
+    #Technically, river phase can be sped up here because if a user's best hand is just
+    #the five on the table, then they are not winning, they draw at best. Can change if it is slow.
+    all_cards = user_hand + table
+    card_combinations = list(combinations(all_cards, 5)) # Thank you FoCS for this knowledge :)
+    best_value = max([max_hand(list(c)) for c in card_combinations])
+    return best_value
