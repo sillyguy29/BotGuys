@@ -181,7 +181,7 @@ class BlackjackButtonsBase(discord.ui.View):
         # remove current players from active player list
         await self.manager.remove_player(interaction)
 
-    @discord.ui.button(label = "Start game", style = discord.ButtonStyle.blurple)
+    @discord.ui.button(label = "Start Game", style = discord.ButtonStyle.blurple)
     async def start(self, interaction: discord.Interaction, button: discord.ui.Button):
         """
         Start the game
@@ -199,7 +199,7 @@ class BlackjackButtonsBaseGame(discord.ui.View):
         self.manager = manager
 
     @discord.ui.button(label = "Resend", style = discord.ButtonStyle.gray)
-    async def start(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def resend(self, interaction: discord.Interaction, button: discord.ui.Button):
         """
         Resend base menu message
         """

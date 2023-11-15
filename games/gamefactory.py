@@ -2,6 +2,7 @@
 """
 from games.counter import CounterManager
 from games.blackjack import BlackjackManager
+from games.uno import UnoManager
 
 
 class GameFactory():
@@ -34,6 +35,11 @@ class GameFactory():
 
         elif game_type == 1:
             new_game = BlackjackManager(self, interaction.channel_id, cpus)
+            self.active_games[interaction.channel_id] = new_game
+            await new_game.create_game(interaction)
+            
+        elif game_type == 3:
+            new_game = UnoManager(self, interaction.channel_id, interaction.user)
             self.active_games[interaction.channel_id] = new_game
             await new_game.create_game(interaction)
 
