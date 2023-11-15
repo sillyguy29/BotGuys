@@ -9,6 +9,7 @@ from games.game import BaseGame
 from games.game import GameManager
 from games.game import BasePlayer
 from util import Card
+from util import double_check
 from util import STANDARD_52_DECK
 from util import cards_to_str_52_standard
 import random
@@ -66,7 +67,7 @@ class BlackjackManager(GameManager):
         self.game.game_state = 4
         # swap default GUI to active game buttons
         await interaction.channel.send(f"{interaction.user} started the game!")
-        self.base_gui = BlackjackButtonsBetPhase(self)
+        self.base_gui = ButtonsBetPhase(self)
 
 
         # draw 2 cards for the dealer and every player
@@ -113,6 +114,37 @@ class BlackjackManager(GameManager):
         
         # resend the base menu with the updated game state
         await self.resend(interaction)
+
+    async def make_bet(self, interaction, bet_amount):
+        # checks to see if the game is over
+        if await self.game_end_check(interaction):
+            return
+
+        # check to see if the user can bet, and deny them if not
+        user = interaction.user
+        user_data = self.game.player_data[user]
+        if user_data.current_bet != 0:
+            await interaction.response.send_message(content="You've already bet this round.",
+                                                    ephemeral=True, delete_after=10)
+            return
+        if int(bet_amount) > user_data.chips:
+            await interaction.response.send_message(content="You cannot afford this bet.",
+                                                    ephemeral=True, delete_after=10)
+            return
+
+        # double check to make sure the user wants to confirm this bet
+        (clicked, interaction) = await double_check(interaction=interaction,
+                                                    message_content=f"Betting {str(bet_amount)}.")
+        if not clicked:
+            await interaction.response.send_message(content="Cancelled bet!",
+                                                    ephemeral=True, delete_after=10)
+            return
+        # perform the bet
+        user_data.current_bet = int(bet_amount)
+        user_data.chips -= int(bet_amount)
+        await interaction.channel.send((f"{user.mention} has bet {str(bet_amount)} "
+                                        f"chips and now has {str(user_data.chips)} "
+                                        "chips left!"))
 
     async def gameplay_loop(self):
         """
@@ -215,22 +247,34 @@ class BlackjackButtonsBaseGame(discord.ui.View):
         await self.manager.resend(interaction)
 
 
-class BlackjackBetModal(discord.ui.Modal):
+class BetModal(discord.ui.Modal):
     def __init__(self, manager):
         super().__init__(title="Bet")
         self.manager = manager
 
-    bet_box = discord.ui.TextInput(label="Enter bet...", max_length=4, default="5")
+    # apparently you just kind of put this down and it works
+    bet_box = discord.ui.TextInput(label="How much do you want to bet?",
+                                   max_length=4,
+                                   placeholder="Enter bet here...")
 
     async def on_submit(self, interaction: discord.Interaction):
         """
-        testing
+        Overriden method that activates when the user submits the form.
         """
-        user_data = str(self.bet_box)
-        print(f"{interaction.user} made a bet of size {user_data}")
+        # converts the user's response into a string
+        user_response = str(self.bet_box)
+        # make sure the bet is valid
+        if not user_response.isdigit():
+            print(f"{interaction.user} failed to bet with response {user_response}")
+            await interaction.response.send_message(content=
+                                                    f"{user_response} is not a valid number.",
+                                                    ephemeral=True, delete_after=10)
+            return
+        print(f"{interaction.user} bet {user_response} chips.")
+        await self.manager.make_bet(interaction, user_response)
 
 
-class BlackjackButtonsBetPhase(discord.ui.View):
+class ButtonsBetPhase(discord.ui.View):
     def __init__(self, manager):
         super().__init__()
         self.manager = manager
@@ -241,7 +285,9 @@ class BlackjackButtonsBetPhase(discord.ui.View):
         Allows the user to bring up the betting menu
         """
         print(f"{interaction.user} pressed {button.label}!")
-        await interaction.response.send_modal(BlackjackBetModal(self.manager))
+        if not await self.manager.deny_non_participants(interaction):
+            return
+        await interaction.response.send_modal(BetModal(self.manager))
 
 
 

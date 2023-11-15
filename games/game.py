@@ -134,20 +134,34 @@ class GameManager():
         """
         # might be a good idea to replace this with an exception
         return "Generic game menu message"
-    
+
     def get_player_data(self, player):
         """
         Return player data object. DO NOT modify this object directly.
         Doing so breaks encapsulation. Only modify through the manager.
         """
         return self.game.player_data[player]
-    
+
     def user_in_game(self, player):
         """
         Returns a boolean value indicating whether the player is in
         the game
         """
         return player in self.game.player_data
+    
+    async def deny_non_participants(self, interaction):
+        """
+        Quick shortcut to deny players who are not in a game.
+        Returns True if they are in game, else returns False.
+
+        Uses interaction if the player is not in the game, otherwise
+        it does not use the interaction.
+        """
+        if interaction.user not in self.game.player_data:
+            await interaction.response.send_message("You are not in this game.",
+                                                    ephemeral=True, delete_after=10)
+            return False
+        return True
 
     async def add_player(self, interaction, init_player_data=None):
         """

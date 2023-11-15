@@ -93,7 +93,7 @@ def generate_deck():
     return deck
 
 
-async def double_check(interaction, message_content="", timeout=10):
+async def double_check(interaction, message_content="", timeout=30):
     """
     Utility function that asks users if they are sure about what they
     are doing through a button prompt. Returns a 2-value tuple, the
@@ -103,12 +103,13 @@ async def double_check(interaction, message_content="", timeout=10):
 
     Params:
     message_content: the content to place above the "are you sure"
-    segment of the message.
+    segment of the message. Defaults to nothing.
     timeout: the time before the menu defaults to no, in seconds.
+    Defaults to 30.
     """
     view = AreYouSureButtons()
-    await interaction.response.send_message(content=f"""{message_content}\nAre you sure?
-                                            (will auto-no in {str(timeout)} seconds.)""",
+    await interaction.response.send_message(content=(f"{message_content}\nAre you sure?"
+                                            f" (will auto-no in {str(timeout)} seconds.)"),
                                             view=view, delete_after=timeout, ephemeral=True)
     # wait for the view to finish
     await view.wait()
@@ -116,7 +117,8 @@ async def double_check(interaction, message_content="", timeout=10):
     # send back the old interaction so we can respond to that instead
     if view.button_interaction is None:
         return (False, interaction)
-    # else, return the result of the interaction
+    # else, return the result of the interaction (and delete the msg)
+    await interaction.delete_original_response()
     return (view.result, view.button_interaction)
 
 
