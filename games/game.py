@@ -81,7 +81,7 @@ class GameManager():
         # construct the first base menu message, grabbing the buttons from self.base_gui
         # and the message contents from self.get_base_menu_string
         await interaction.response.send_message(content=self.get_base_menu_string(),
-                                                view=self.base_gui)
+                                                view=self.base_gui, silent=True)
         # set our base menu message to the message that the interaction (ie the slash command
         # that started the game) was responded with (the base menu created by this interaction)
         self.current_active_menu = await interaction.original_response()
@@ -109,9 +109,8 @@ class GameManager():
         await self.current_active_menu.edit(view=None)
         # InteractionMessage inherits from Message so we can access the channel attribute to
         # send a new base menu into
-        self.current_active_menu = await self.current_active_menu.channel.send(
-                                        self.get_base_menu_string(), view=self.base_gui,
-                                        silent=True)
+        self.current_active_menu = await self.channel.send(self.get_base_menu_string(),
+                                                           view=self.base_gui, silent=True)
 
     async def quit_game(self, interaction):
         """
@@ -212,20 +211,4 @@ class GameManager():
             return True
         # False -> game has not ended
         return False
-    
-
-#async def double_check(interaction):
-
-
-class AreYouSureButtons(discord.ui.View):
-    """
-    Helper class designed to facilitate a double check from the user upon trying to perform
-    certain actions
-    """
-    @discord.ui.button(label = "Yes", style = discord.ButtonStyle.green)
-    async def yes_pressed(self, interaction: discord.Interaction, button: discord.ui.Button):
-        return (True, interaction)
-    
-    @discord.ui.button(label = "No", style = discord.ButtonStyle.red)
-    async def no_pressed(self, interaction: discord.Interaction, button: discord.ui.Button):
-        return (False, interaction)
+ 

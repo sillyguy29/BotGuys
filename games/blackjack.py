@@ -215,10 +215,10 @@ class BlackjackButtonsBaseGame(discord.ui.View):
         await self.manager.resend(interaction)
 
 
-class BlackjackBetModal(discord.ui.Modal, title="Bet"):
-    def __init__(self, manager, player):
+class BlackjackBetModal(discord.ui.Modal):
+    def __init__(self, manager):
+        super().__init__(title="Bet")
         self.manager = manager
-        self.player = player
 
     bet_box = discord.ui.TextInput(label="Enter bet...", max_length=4, default="5")
 
@@ -226,7 +226,8 @@ class BlackjackBetModal(discord.ui.Modal, title="Bet"):
         """
         testing
         """
-        user_data = str(bet_box)
+        user_data = str(self.bet_box)
+        print(f"{interaction.user} made a bet of size {user_data}")
 
 
 class BlackjackButtonsBetPhase(discord.ui.View):
@@ -240,7 +241,7 @@ class BlackjackButtonsBetPhase(discord.ui.View):
         Allows the user to bring up the betting menu
         """
         print(f"{interaction.user} pressed {button.label}!")
-        await interaction.response.send_modal(BlackjackBetModal(self.manager, interaction.user))
+        await interaction.response.send_modal(BlackjackBetModal(self.manager))
 
 
 
