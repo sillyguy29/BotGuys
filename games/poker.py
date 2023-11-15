@@ -11,6 +11,7 @@ from games.game import BasePlayer
 from util import Card
 from util import generate_deck
 import random
+from itertools import combinations
 
 class PokerPlayer(BasePlayer):
     def __init__(self, is_cpu=False):
@@ -378,3 +379,23 @@ def compare_hands(hand1, hand2):
     elif hand1_value < hand2_value:
         return 2
     return 0
+
+def best_hand(user_hand, table):
+    """
+    This finds the best value using 0-2 of the user_hand
+    and 3-5 of the table cards.
+    """
+    if len(user_hand) != 2:
+        raise ValueError("User hand must contain 2 cards")
+    if len(table) > 5 or len(table) < 3:
+        raise ValueError("Table must contain 3-5 cards")
+    
+    #During the flop, the card combination is 5 choose 5, so one possible hand per-person
+    #During the turn, the card combination is 6 choose 5, so 6 possible hands per-person
+    #During the river, the card combination is 7 choose 5, so 21 possible hands per-person
+    #Technically, river phase can be sped up here because if a user's best hand is just
+    #the five on the table, then they are not winning, they draw at best. Can change if it is slow.
+    all_cards = user_hand + table
+    card_combinations = list(combinations(all_cards, 5)) # Thank you FoCS for this knowledge :)
+    best_value = max([max_hand(list(c)) for c in card_combinations])
+    return best_value
