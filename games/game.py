@@ -95,7 +95,7 @@ class GameManager():
             return
 
         await self.current_active_menu.edit(content=self.get_base_menu_string(),
-                                            view=self.base_gui, silent=True)
+                                            view=self.base_gui)
 
     async def resend(self, interaction):
         """
