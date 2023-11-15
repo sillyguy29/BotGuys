@@ -135,6 +135,20 @@ class GameManager():
         """
         # might be a good idea to replace this with an exception
         return "Generic game menu message"
+    
+    def get_player_data(self, player):
+        """
+        Return player data object. DO NOT modify this object directly.
+        Doing so breaks encapsulation. Only modify through the manager.
+        """
+        return self.game.player_data[player]
+    
+    def user_in_game(self, player):
+        """
+        Returns a boolean value indicating whether the player is in
+        the game
+        """
+        return player in self.game.player_data
 
     async def add_player(self, interaction, init_player_data=None):
         """
@@ -149,7 +163,7 @@ class GameManager():
             await interaction.response.send_message("This game is open to any player at any time.",
                                                      ephemeral = True, delete_after = 10)
         elif self.game.game_state in (1, 2):
-            if interaction.user in self.game.player_data:
+            if self.user_in_game(interaction.user):
                 await interaction.response.send_message("You are already in this game.",
                                                         ephemeral = True, delete_after = 10)
             else:
@@ -172,7 +186,7 @@ class GameManager():
         if self.game.game_state == 0:
             await interaction.response.send_message("This game is open to any player at any time.",
                                                      ephemeral = True, delete_after = 10)
-        elif interaction.user not in self.game.player_data:
+        elif not self.user_in_game(interaction.user):
             await interaction.response.send_message("You are not in this game.",
                                                      ephemeral = True, delete_after = 10)
         elif self.game.game_state in (1, 3):
