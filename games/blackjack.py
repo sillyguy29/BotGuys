@@ -65,21 +65,47 @@ class BlackjackManager(GameManager):
             return
         # game_state == 4 -> players cannot join or leave
         self.game.game_state = 4
-        # swap default GUI to active game buttons
-        await interaction.channel.send(f"{interaction.user} started the game!")
-        self.base_gui = ButtonsBetPhase(self)
+        # swap default GUI to betting phase buttons
+        await interaction.channel.send(f"{interaction.user.display_name} started the game!")
+        self.base_gui = ButtonsBetPhase(self, self.game.players)
+        await self.resend(interaction)
 
+
+    async def deal_cards(self):
+        # make sure we're at the end of the betting phase
+        if self.game.game_state != 4:
+            return
+        # game_state 5 -> dealing phase (players cannot join or leave)
+        self.game.game_state = 5
+
+        await self.channel.send("All players have bet! Dealing cards...")
 
         # draw 2 cards for the dealer and every player
         self.game.dealer_hand.extend(STANDARD_52_DECK.draw(1))
         for i in self.game.player_data:
             self.game.player_data[i].hand.extend(STANDARD_52_DECK.draw(2))
-        await self.resend(interaction)
+
+        # TODO: resend doesn't support sending only based on channel.
+        # current solution is to just reimplement its logic here,
+        # pls improve
+        if  self.game.game_state == -1:
+            return
+        await self.current_active_menu.edit(view=None)
+        self.base_gui = BlackjackButtonsBaseGame(self)
+        self.current_active_menu = await self.channel.send(self.get_base_menu_string(),
+                                                           view=self.base_gui, silent=True)
 
     def get_base_menu_string(self):
         if self.game.game_state == 1:
             return "Who's ready for a game of blackjack?"
-        elif self.game.game_state >= 4:
+        elif self.game.game_state == 4:
+            ret = "Current bets and chips:\n"
+            for player in self.game.turn_order:
+                player_data = self.game.player_data[player]
+                ret += (f"{player.display_name}: Chips: {player_data.chips}, "
+                        f"Bet: {player_data.current_bet}\n")
+            return ret
+        elif self.game.game_state == 5:
             ret = f"Dealer hand: {cards_to_str_52_standard(self.game.dealer_hand)}, ??\n"
             for player in self.game.turn_order:
                 ret += (f"{player.mention} ({self.game.player_data[player].chips} chips): "
@@ -109,9 +135,9 @@ class BlackjackManager(GameManager):
         # check to make sure the game hasn't ended, do nothing if it has
         if await self.game_end_check(interaction):
             return
-        
+
         # more interaction to be added to actually make it go to the next player
-        
+
         # resend the base menu with the updated game state
         await self.resend(interaction)
 
@@ -133,9 +159,9 @@ class BlackjackManager(GameManager):
             return
 
         # double check to make sure the user wants to confirm this bet
-        (clicked, interaction) = await double_check(interaction=interaction,
+        (yes_clicked, interaction) = await double_check(interaction=interaction,
                                                     message_content=f"Betting {str(bet_amount)}.")
-        if not clicked:
+        if not yes_clicked:
             await interaction.response.send_message(content="Cancelled bet!",
                                                     ephemeral=True, delete_after=10)
             return
@@ -145,6 +171,10 @@ class BlackjackManager(GameManager):
         await interaction.channel.send((f"{user.mention} has bet {str(bet_amount)} "
                                         f"chips and now has {str(user_data.chips)} "
                                         "chips left!"))
+        # Update the view so it knows how many players have bet
+        # TODO: this solution is janky as fuck pls fix
+        await self.base_gui.add_betted_player()
+        return
 
     async def gameplay_loop(self):
         """
@@ -156,7 +186,7 @@ class BlackjackManager(GameManager):
             self.game.dealer_hand.append(self.game.deck.pop())
 
             #TODO add code here to send message indicating dealer hand
-            
+
             player_turn_list = list(range(self.game.players))
             for turn in player_turn_list:
                 #Iterates through dict of player data to find the turn
@@ -206,7 +236,7 @@ class BlackjackButtonsBase(discord.ui.View):
 
         indi_player_data = BlackjackPlayer()
         await self.manager.add_player(interaction, indi_player_data)
-    
+
     @discord.ui.button(label = "Quit", style = discord.ButtonStyle.red)
     async def quit(self, interaction: discord.Interaction, button: discord.ui.Button):
         """
@@ -275,9 +305,16 @@ class BetModal(discord.ui.Modal):
 
 
 class ButtonsBetPhase(discord.ui.View):
-    def __init__(self, manager):
+    def __init__(self, manager, player_count):
         super().__init__()
         self.manager = manager
+        self.player_count = player_count
+        self.players_with_bets = 0
+
+    async def add_betted_player(self):
+        self.players_with_bets += 1
+        if self.players_with_bets == self.player_count:
+            await self.manager.deal_cards()
 
     @discord.ui.button(label = "Bet!", style = discord.ButtonStyle.green)
     async def bet(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -288,7 +325,6 @@ class ButtonsBetPhase(discord.ui.View):
         if not await self.manager.deny_non_participants(interaction):
             return
         await interaction.response.send_modal(BetModal(self.manager))
-
 
 
 class HitOrStand(discord.ui.View):
