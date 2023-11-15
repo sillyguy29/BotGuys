@@ -70,14 +70,14 @@ STANDARD_52_DECK = Deck(('D', 'H', 'S', 'C'),
 def cards_to_str_52_standard(cards):
     ret = ""
     for card in cards:
-        ret += card.face
-        if card.suit == "D":
+        ret += card.value
+        if card.name == "D":
             ret += ":diamonds:, "
-        elif card.suit == "H":
+        elif card.name == "H":
             ret += ":hearts:, "
-        elif card.suit == "S":
+        elif card.name == "S":
             ret += ":spades:, "
-        elif card.suit == "C":
+        elif card.name == "C":
             ret += ":clubs:, "
     return ret.rstrip(", ")
 
