@@ -20,11 +20,12 @@ class BlackjackPlayer(BasePlayer):
 
         self.hand = []
         self.chips = 300
+        self.current_bet = 0
 
 
 class BlackjackGame(BaseGame):
     """
-    Blackjack game model class. Keeps track of the deck and none else
+    Blackjack game model class. Keeps track of the turn order and dealer's hand
     """
     def __init__(self, cpus):
         # game state 1 -> accepting players but not playing yet
@@ -37,9 +38,9 @@ class BlackjackGame(BaseGame):
  
         
 class BlackjackManager(GameManager):
-    def __init__(self, factory, channel_id, cpus):
+    def __init__(self, factory, channel, cpus):
         super().__init__(game=BlackjackGame(cpus), base_gui=BlackjackButtonsBase(self),
-                         channel_id=channel_id, factory=factory)
+                         channel=channel, factory=factory)
 
     async def add_player(self, interaction, init_player_data=None):
         await super().add_player(interaction, init_player_data)
@@ -57,27 +58,31 @@ class BlackjackManager(GameManager):
             await self.quit_game(interaction)
 
     async def start_game(self, interaction):
-        if self.game.game_state == 4:
+        if self.game.game_state != 1:
             interaction.response.send_message("This game has already started.",
                                               ephemeral = True, delete_after = 10)
             return
         # game_state == 4 -> players cannot join or leave
         self.game.game_state = 4
         # swap default GUI to active game buttons
-        self.base_gui = BlackjackButtonsBaseGame(self)
+        await interaction.channel.send(f"{interaction.user} started the game!")
+        self.base_gui = BlackjackButtonsBetPhase(self)
+
+
         # draw 2 cards for the dealer and every player
-        self.game.dealer_hand.extend(STANDARD_52_DECK.draw(2))
+        self.game.dealer_hand.extend(STANDARD_52_DECK.draw(1))
         for i in self.game.player_data:
             self.game.player_data[i].hand.extend(STANDARD_52_DECK.draw(2))
         await self.resend(interaction)
 
     def get_base_menu_string(self):
         if self.game.game_state == 1:
-            return "Welcome to this game of Blackjack. Feel free to join."
-        elif self.game.game_state == 4:
-            ret = f"Dealer hand: {cards_to_str_52_standard(self.game.dealer_hand)}\n"
+            return "Who's ready for a game of blackjack?"
+        elif self.game.game_state >= 4:
+            ret = f"Dealer hand: {cards_to_str_52_standard(self.game.dealer_hand)}, ??\n"
             for player in self.game.turn_order:
-                ret += f"{player}: {cards_to_str_52_standard(self.game.player_data[player].hand)}\n"
+                ret += (f"{player.mention} ({self.game.player_data[player].chips} chips): "
+                f"{cards_to_str_52_standard(self.game.player_data[player].hand)}\n")
             return ret
         return "You shouldn't be seeing this."
 
@@ -88,11 +93,11 @@ class BlackjackManager(GameManager):
         # check to make sure the game hasn't ended, do nothing if it has
         if await self.game_end_check(interaction):
             return
-        
+
         # add a card to the user's hand
         card = self.game.deck.pop()
         self.game.player_data[interaction.user]["hand"].append(card)
-        
+
         # resend the base menu with the updated game state
         await self.resend(interaction)
 
@@ -199,7 +204,7 @@ class BlackjackButtonsBaseGame(discord.ui.View):
         self.manager = manager
 
     @discord.ui.button(label = "Resend", style = discord.ButtonStyle.gray)
-    async def start(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def resend(self, interaction: discord.Interaction, button: discord.ui.Button):
         """
         Resend base menu message
         """
@@ -208,6 +213,21 @@ class BlackjackButtonsBaseGame(discord.ui.View):
         print(f"{interaction.user} pressed {button.label}!")
         # resend
         await self.manager.resend(interaction)
+
+
+class BlackjackBet(discord.ui.TextInput):
+    def __init__(self):
+        super().__init__(label="Enter bet...", max_length=4, default="4")
+
+    async def callback(self, interaction):
+        interaction.response.send_message("test")
+
+
+class BlackjackButtonsBetPhase(discord.ui.View):
+    def __init__(self, manager):
+        super().__init__()
+        self.manager = manager
+        self.add_item(BlackjackBet())
 
 
 class HitOrStand(discord.ui.View):

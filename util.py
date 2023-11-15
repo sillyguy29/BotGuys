@@ -60,25 +60,26 @@ class Deck:
         for i in range(count):
             ret_cards.append(self.cards[random.randint(0, self.single_deck_size - 1)])
         return ret_cards
-    
 
-STANDARD_52_DECK = Deck(('D', 'H', 'S', 'C'), 
+
+STANDARD_52_DECK = Deck(('D', 'H', 'S', 'C'),
                         ('A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'),
                         1, ())
-        
+
+
 def cards_to_str_52_standard(cards):
     ret = ""
     for card in cards:
         ret += card.face
         if card.suit == "D":
-            ret += ":diamonds: "
+            ret += ":diamonds:, "
         elif card.suit == "H":
-            ret += ":hearts: "
+            ret += ":hearts:, "
         elif card.suit == "S":
-            ret += ":spades: "
+            ret += ":spades:, "
         elif card.suit == "C":
-            ret += ":clubs: "
-    return ret
+            ret += ":clubs:, "
+    return ret.rstrip(", ")
 
 def generate_deck():
     deck = []

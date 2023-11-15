@@ -25,9 +25,9 @@ class CounterManager(GameManager):
     """
     Manages a counter game. Has operations to increment and decrement the count
     """
-    def __init__(self, factory, channel_id):
+    def __init__(self, factory, channel):
         super().__init__(game=CounterGame(), base_gui=CounterButtonsBase(self), 
-                         channel_id=channel_id, factory=factory)
+                         channel=channel, factory=factory)
 
     def get_base_menu_string(self):
         return f"Counter: {self.game.count}"

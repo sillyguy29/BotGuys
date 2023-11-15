@@ -58,14 +58,14 @@ class GameManager():
     Methods can (and should) be overridden but be careful when doing so as to not
     break the default flow of all games
     """
-    def __init__(self, game, base_gui, channel_id, factory):
+    def __init__(self, game, base_gui, channel, factory):
         # hold the game model that this manager needs to manage (pass constructor to
         # subclass of BaseGame for that game)
         self.game = game
         # default button layout that the bot can use to construct the base menu at any time
         self.base_gui = base_gui
         # ID of the channel that this game is taking place in
-        self.channel_id = channel_id
+        self.channel = channel
         # reference to the GameFactory class, needed to remove the game from the active games
         # dict upon the game ending
         self.factory = factory
@@ -95,7 +95,7 @@ class GameManager():
             return
 
         await self.current_active_menu.edit(content=self.get_base_menu_string(),
-                                            view=self.base_gui)
+                                            view=self.base_gui, silent=True)
 
     async def resend(self, interaction):
         """
@@ -110,7 +110,8 @@ class GameManager():
         # InteractionMessage inherits from Message so we can access the channel attribute to
         # send a new base menu into
         self.current_active_menu = await self.current_active_menu.channel.send(
-                                        self.get_base_menu_string(), view=self.base_gui)
+                                        self.get_base_menu_string(), view=self.base_gui,
+                                        silent=True)
 
     async def quit_game(self, interaction):
         """
@@ -124,7 +125,7 @@ class GameManager():
 
         self.game.game_state = -1
         await self.current_active_menu.edit(view=None)
-        await self.factory.stop_game(self.channel_id)
+        await self.factory.stop_game(self.channel.id)
         # now we just pray that python's garbage collection notices this
 
     def get_base_menu_string(self):

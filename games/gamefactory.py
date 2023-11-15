@@ -28,12 +28,12 @@ class GameFactory():
                                                     ephemeral = True)
 
         if game_type == 0:
-            new_game = CounterManager(self, interaction.channel_id)
+            new_game = CounterManager(self, interaction.channel)
             self.active_games[interaction.channel_id] = new_game
             await new_game.create_game(interaction)
 
         elif game_type == 1:
-            new_game = BlackjackManager(self, interaction.channel_id, cpus)
+            new_game = BlackjackManager(self, interaction.channel, cpus)
             self.active_games[interaction.channel_id] = new_game
             await new_game.create_game(interaction)
 
