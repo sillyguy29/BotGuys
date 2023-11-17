@@ -36,13 +36,15 @@ class UnoGame(BaseGame):
         random.shuffle(self.deck)
         self.discard = []
         self.turn_order = []
+        self.turn_index = 0
+        self.reversed = False
         self.top_card = UnoCard("None", "")
       
         
 class UnoManager(GameManager):
-    def __init__(self, factory, channel_id, user_id):
+    def __init__(self, factory, channel, user_id):
         super().__init__(game=UnoGame(), base_gui=UnoButtonsBase(self),
-                         channel_id=channel_id, factory=factory)
+                         channel=channel, factory=factory)
         
     async def add_player(self, interaction, init_player_data=None):
         await super().add_player(interaction, init_player_data)
@@ -76,7 +78,7 @@ class UnoManager(GameManager):
         if self.game.game_state == 1:
             return "Welcome to this game of Uno. Feel free to join."
         elif self.game.game_state == 4:
-            output = f"Top Card: {card_to_emoji(self.game.top_card)}"
+            output = f"Top Card: {card_to_emoji(self.game.top_card)} \n It's {self.game.turn_order[self.game.turn_index]} turn!"
             return output
         return "Game has started!"
         
@@ -112,6 +114,79 @@ class UnoManager(GameManager):
     
     def get_player_hand(self, player):
         return self.game.player_data[player].hand
+    
+    def update_turn_index(self):
+        index = self.game.turn_index
+        if not self.game.reversed:
+            index += 1
+            if index == len(self.game.turn_order):
+                index = 0
+            self.game.turn_index = index
+        elif self.game.reversed:
+            index -= 1
+            if index == -1:
+                index = len(self.game.turn_order) - 1
+            self.game.turn_index = index
+    
+    def get_next_turn_index(self):
+        next_player = self.game.turn_index
+        if not self.game.reversed:
+            next_player += 1
+            if next_player == len(self.game.turn_order):
+                next_player = 0
+            return next_player
+        elif self.game.reversed:
+            next_player -= 1
+            if next_player == -1:
+                next_player = len(self.game.turn_order) - 1
+            return next_player
+    
+    #TODO finish this
+    async def play_card(self, interaction, card):
+        self.game.discard.append(self.game.top_card)
+        self.game.top_card = card
+
+        # If "Reverse" card was played, reverse the queue
+        if card.value == "Reverse":
+            #self.game.players = list(reversed(self.game.players))
+            if self.game.reversed:
+                self.game.reversed = False
+            elif not self.game.reversed:
+                self.game.reversed = True
+            await interaction.response.send_message("Reversing the turn order!")
+
+        # If "Wild" card is played, inquire what color is next
+        if card.name == "Wild":
+            view = UnoWildCard(self)
+            await interaction.response.send_message("Choose a color!", view = view, ephemeral = True)
+            #self.chooseColor(player)
+
+        # If "Skip" was played, flag them as 'skipped'
+        if card.value == "Skip":
+            victim = self.game.players[0]
+            self.announce(victim.name + " got skipped! LOL!")
+            self.game.players[0].skipped = True
+
+        # If "Draw Two" was played, make next player draw two cards
+        #    and then flag them as 'skipped'
+        if card.value == "Draw Two":
+            victim = self.game.players[0]
+            self.announce(victim.name + " eats two cards! LMAO!")
+            self.drawCards(self.game.players[0], 2)
+            self.game.players[0].skipped = True
+
+        # If "Draw Four" was played, make next player draw four cards
+        #    and then flag them as 'skipped'
+        if card.value == "Draw Four":
+            victim = self.game.players[0]
+            self.announce(victim.name + " eats four cards! RFOL!!")
+            self.drawCards(self.game.players[0], 4)
+            self.game.players[0].skipped = True
+
+        # Remove the played card from the player's hand
+        self.game.player_data[interaction.user].hand.remove(card)
+        #if len(player.hand) == 1:
+        #    self.announce(player.name + " has only one card left!")
 
 
 class UnoButtonsBase(discord.ui.View):
@@ -178,6 +253,9 @@ class UnoButtonsBaseGame(discord.ui.View):
         print(f"{interaction.user} pressed {button.label}!")
             
         view = UnoCardButtons(self.manager, self.manager.get_player_hand(interaction.user))
+        if self.manager.game.turn_order[self.manager.game.turn_index] == interaction.user:
+            view = UnoCardButtons(self.manager, self.manager.get_player_hand(interaction.user), False)
+        
         await interaction.response.send_message("Your cards:", view = view, ephemeral = True,
                                                 delete_after = 20)
         # wait for the view to call self.stop() before we move beyond this point
@@ -201,23 +279,24 @@ class UnoCardButtons(discord.ui.View):
     """
     Creates private group of buttons representing the cards in a user's hand
     """
-    def __init__(self, manager, player_hand):
+    def __init__(self, manager, player_hand, disabled=True):
         super().__init__()
         self.manager = manager
         self.player_hand = player_hand
+        self.disabled = disabled
         
         for i in range(len(self.player_hand)):
-            self.add_item(CardButton(self.manager, self.player_hand[i]))
+            self.add_item(CardButton(self.manager, self.player_hand[i], self.disabled))
 
   
 class CardButton(discord.ui.Button):
     """
     Button class that represents an individual card in a user's hand
     """
-    def __init__(self, manager, card_name, disabled=True):
-        super().__init__(style=discord.ButtonStyle.gray, label=f"{card_name.value}", emoji=color_to_emoji(card_name))
+    def __init__(self, manager, card, disabled=True):
+        super().__init__(style=discord.ButtonStyle.gray, label=f"{card.value}", emoji=color_to_emoji(card))
         self.manager = manager
-        self.card_name = card_name
+        self.card_name = card
         self.disabled = disabled
         
     async def callback(self, interaction: discord.Interaction):
@@ -226,11 +305,50 @@ class CardButton(discord.ui.Button):
         view: UnoCardButtons = self.view
     
         #TODO: Add code that places a card down/rejects chosen card
-    
-        self.disabled = True    
+        if self.manager.play_card() == True:
+            # do x
+            self.disabled = True
+        else:
+            # do y
+            self.disabled = False
+        
         view.stop()
         await interaction.response.send_message(f"You played {self.label}", ephemeral = True,
                                                 delete_after = 10)
+
+
+class UnoWildCard(discord.ui.View):
+    def __init__(self, manager):
+        super().__init__()
+        self.manager = manager
+        
+    @discord.ui.button(label = "Red", style = discord.ButtonStyle.gray, emoji = "🔴")
+    async def red(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        Chnages the wild card to red.
+        """
+        print(f"{interaction.user} pressed {button.label}!")
+        
+    @discord.ui.button(label = "Blue", style = discord.ButtonStyle.gray, emoji = "🔵")
+    async def blue(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        Chnages the wild card to blue.
+        """
+        print(f"{interaction.user} pressed {button.label}!")
+        
+    @discord.ui.button(label = "Yellow", style = discord.ButtonStyle.gray, emoji = "🟡")
+    async def yellow(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        Chnages the wild card to yellow.
+        """
+        print(f"{interaction.user} pressed {button.label}!")
+        
+    @discord.ui.button(label = "Green", style = discord.ButtonStyle.gray, emoji = "🟢")
+    async def green(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        Chnages the wild card to green.
+        """
+        print(f"{interaction.user} pressed {button.label}!")
 
 
 class UnoCard(Card):
