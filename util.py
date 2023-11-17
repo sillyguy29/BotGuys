@@ -142,3 +142,11 @@ class AreYouSureButtons(discord.ui.View):
     async def no_pressed(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.button_interaction = interaction
         self.stop()
+
+
+async def send_info_message(content, interaction):
+    """
+    Sends a 10-second ephemeral message with the content specified
+    in response to user input (usually to deny operations)
+    """
+    await interaction.response.send_message(content=content, ephemeral=True, delete_after=10)

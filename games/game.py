@@ -50,6 +50,12 @@ class BaseGame():
         # made
         return self.max_players > self.players
 
+    def user_in_game(self, player):
+        if self.game_state == 0:
+            return True
+        else:
+            return player in self.player_data
+
 
 class GameManager():
     """
@@ -147,7 +153,7 @@ class GameManager():
         Returns a boolean value indicating whether the player is in
         the game
         """
-        return player in self.game.player_data
+        return self.game.user_in_game(player)
     
     async def deny_non_participants(self, interaction):
         """
@@ -182,8 +188,8 @@ class GameManager():
             else:
                 self.game.players += 1
                 self.game.player_data[interaction.user] = init_player_data
-                await interaction.response.send_message("Joined game.", ephemeral = True, 
-                                                        delete_after = 10)
+                await interaction.response.send_message((f"{interaction.user.mention} "
+                                                         "joined the game!"))
         else:
             await interaction.response.send_message("This game is not currently accepting players.",
                                                      ephemeral = True, delete_after = 10)
@@ -205,7 +211,8 @@ class GameManager():
         elif self.game.game_state in (1, 3):
             self.game.players -= 1
             self.game.player_data.pop(interaction.user)
-            await interaction.response.send_message("Left game.", ephemeral=True, delete_after=10)
+            await interaction.response.send_message((f"{interaction.user.mention} "
+                                                    "left the game!"))
         else:
             await interaction.response.send_message("You cannot leave this game right now.",
                                                      ephemeral = True, delete_after = 10)
