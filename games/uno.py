@@ -20,7 +20,7 @@ class UnoPlayer(BasePlayer):
         self.skipped = False
         
     def get_playable_cards(self, top_card):
-        playable_cards = [card for card in self.hand if card.color == top_card.color or card.value == top_card.value or card.color == "Wild"]
+        playable_cards = [card for card in self.hand if card.name == top_card.name or card.value == top_card.value or card.name == "Wild"]
         return playable_cards
 
 
@@ -112,6 +112,55 @@ class UnoManager(GameManager):
     
     def get_player_hand(self, player):
         return self.game.player_data[player].hand
+    
+
+    async def gameplay_loop(self):
+        # Let's keep track of how many turns have passed
+        num_turns = 0
+
+        while True:
+            
+            # Increment turn counter
+            num_turns += 1
+
+            # Check if next player is skipped. If so, put them in the 
+            # back of the queue
+            while self.game.turn_order[0].skipped:
+                skipped_player = self.game.turn_order.pop(0)
+                skipped_player.skipped = False
+                self.game.turn_order.append(skipped_player)
+
+            # Announce to everybody who's turn it is and the top card
+            turn_player_name = self.game.turn_order.pop(0)
+            await self.channel.send(turn_player_name + "'s turn (Turn " + str(num_turns) + ")")
+            await self.channel.send("Top card: " + str(self.game.top_card))
+            
+            
+            # Disallow all players to press any button in their button menus
+            for player in self.game.player_data.values():
+                view = UnoCardButtons(self.manager, self.manager.get_player_hand(player))
+                await player.send_message("", view = view, ephemeral = True, delete_after = 20)
+
+            # Allow the turn player to select a card, or draw
+            view = UnoCardButtons(self.manager, self.manager.get_player_hand(turn_player_name))
+            player = self.game.player_data[turn_player_name]
+            playable_cards = player.get_playable_cards(self.game.top_card)
+            for button in view.children:
+                if button.name in [str(card) for card in playable_cards]:
+                    button.disabled = False
+            await player.send_message("Your move...", view = view, ephemeral = True,
+                                                    delete_after = 20)
+            # wait for the view to call self.stop() before we move beyond this point
+            await view.wait()
+
+            # Check if the player has any cards left, lest they won the game
+            if len(self.manager.get_player_hand(turn_player_name)) == 0:
+                self.announce(player.name + " has won the game!")
+                break
+
+            # Put the turn player at the end of the turn order queue
+            self.game.turn_order.append(turn_player_name)
+
 
 
 class UnoButtonsBase(discord.ui.View):
