@@ -38,6 +38,16 @@ def create_commands(client):
         print(f"{interaction.user} used a slash command!")
         await interaction.response.send_message("Secret message", ephemeral=True)
 
+    # Help command, should load from text file help_info.txt into HELP_MESSAGE string
+    # Traditionally, discord bots DM the user with the help message.
+    # Right now, it is ephemeral.
+    with open('help_info.txt', 'r') as help_file:
+        HELP_MESSAGE = help_file.read()
+    @client.tree.command(name="help", description="Learn about Lantern and its games")
+    async def help_command(interaction: discord.Interaction):
+        print(f"{interaction.user} used the help command!")
+        await interaction.response.send_message(HELP_MESSAGE, ephemeral=True)
+
     @client.tree.command(name="counter", description="Play a simple counter game")
     async def play_counter(interaction: discord.Interaction):
         print(f"{interaction.user} is starting a game!")
