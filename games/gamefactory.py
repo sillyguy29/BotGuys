@@ -22,6 +22,9 @@ class GameFactory():
         ----
         0 = Counter
         1 = Blackjack
+        2 = Poker
+        3 = Uno
+        4 = Love Letter
         """
         if interaction.channel_id in self.active_games:
             await interaction.response.send_message(content="A game has already"
@@ -39,7 +42,7 @@ class GameFactory():
             await new_game.create_game(interaction)
             
         elif game_type == 3:
-            new_game = UnoManager(self, interaction.channel_id, interaction.user)
+            new_game = UnoManager(self, interaction.channel, interaction.user)
             self.active_games[interaction.channel_id] = new_game
             await new_game.create_game(interaction)
 
