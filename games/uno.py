@@ -22,6 +22,8 @@ class UnoPlayer(BasePlayer):
     def get_playable_cards(self, top_card):
         playable_cards = [card for card in self.hand if card.name == top_card.name or card.value == top_card.value or card.name == "Wild"]
         return playable_cards
+        
+    
 
 
 class UnoGame(BaseGame):
@@ -72,6 +74,7 @@ class UnoManager(GameManager):
         self.base_gui = UnoButtonsBaseGame(self)
         # setup the game board
         self.setup()
+        self.gameplay_loop()
         await self.resend(interaction)
         
     def get_base_menu_string(self):
@@ -83,25 +86,27 @@ class UnoManager(GameManager):
         return "Game has started!"
         
     def setup(self):
+        # Each player gets 7 cards to start
         for i in self.game.player_data:
             self.draw_cards(self.game.player_data[i], 7)
 
         # Assign the top-card. The game cannot begin on a "Reverse", "Skip", "Draw Two", or "Wild"
-        print()
-        print("Setting up the table...")
         while True:
             self.game.top_card = self.game.deck.pop()
-            print(f"The top card is {self.game.top_card}. ", end="")
             top_card_is_valid = True
             if (self.game.top_card.value == "Reverse"): top_card_is_valid = False
             if (self.game.top_card.value == "Skip"): top_card_is_valid = False
             if (self.game.top_card.value == "Draw Two"): top_card_is_valid = False
             if (self.game.top_card.name == "Wild"): top_card_is_valid = False
             if not top_card_is_valid: 
-                print("That's no good... Picking a new top card...")
+                self.game.discard.append(self.game.top_card)
+                continue
             else:
-                print("Let the game begin!")
                 break
+
+        # Shuffle the ordering and select a random player to start the game
+        random.shuffle(self.game.turn_order)
+        self.game.turn_index = random.randint(0, len(self.game.turn_order)-1)
             
     def draw_cards(self, player, num_cards=1):
         for i in range(num_cards):
@@ -197,12 +202,11 @@ class UnoManager(GameManager):
             # Increment turn counter
             num_turns += 1
 
-            # Check if next player is skipped. If so, put them in the 
-            # back of the queue
-            while self.game.turn_order[0].skipped:
-                skipped_player = self.game.turn_order.pop(0)
-                skipped_player.skipped = False
-                self.game.turn_order.append(skipped_player)
+            # Check if next player is skipped, move on to next-next player
+            next_player = self.game.player_data[self.turn_order[self.turn_index]]
+            if next_player.skipped:
+                next_player.skipped = False
+                self.update_turn_index()
 
             # Announce to everybody who's turn it is and the top card
             turn_player_name = self.game.turn_order.pop(0)
@@ -234,6 +238,8 @@ class UnoManager(GameManager):
 
             # Put the turn player at the end of the turn order queue
             self.game.turn_order.append(turn_player_name)
+
+
 
 
 class UnoButtonsBase(discord.ui.View):
@@ -298,11 +304,8 @@ class UnoButtonsBaseGame(discord.ui.View):
         game end).
         """
         print(f"{interaction.user} pressed {button.label}!")
-            
-        view = UnoCardButtons(self.manager, self.manager.get_player_hand(interaction.user))
-        if self.manager.game.turn_order[self.manager.game.turn_index] == interaction.user:
-            view = UnoCardButtons(self.manager, self.manager.get_player_hand(interaction.user), False)
         
+        view = UnoCardButtons(self.manager, interaction.user)
         await interaction.response.send_message("Your cards:", view = view, ephemeral = True,
                                                 delete_after = 20)
         # wait for the view to call self.stop() before we move beyond this point
@@ -326,14 +329,17 @@ class UnoCardButtons(discord.ui.View):
     """
     Creates private group of buttons representing the cards in a user's hand
     """
-    def __init__(self, manager, player_hand, disabled=True):
+    def __init__(self, manager, player):
         super().__init__()
         self.manager = manager
-        self.player_hand = player_hand
-        self.disabled = disabled
+        self.player_hand = self.manager.get_player_hand(player)
         
         for i in range(len(self.player_hand)):
-            self.add_item(CardButton(self.manager, self.player_hand[i], self.disabled))
+            current_turn_player = self.manager.game.turn_order[self.manager.game.turn_index]
+            this_card = self.player_hand[i]
+            playable_cards = self.manager.game.player_data[player].get_playable_cards(self.manager.game.top_card)
+            disabled = (player != current_turn_player) or (this_card not in playable_cards)
+            self.add_item(CardButton(self.manager, self.player_hand[i], disabled))
 
   
 class CardButton(discord.ui.Button):
