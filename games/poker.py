@@ -9,6 +9,10 @@ from games.game import BaseGame
 from games.game import GameManager
 from games.game import BasePlayer
 from util import Card
+from util import double_check
+from util import STANDARD_52_DECK
+from util import cards_to_str_52_standard
+from util import send_info_message
 from util import generate_deck
 import random
 from itertools import combinations
@@ -17,8 +21,9 @@ class PokerPlayer(BasePlayer):
     def __init__(self, is_cpu=False):
         super().__init__()
         self.hand = []
-        self.chips = 0
-        self.bet = 0
+        self.chips = 10000
+        self.round_bet = 0
+        self.total_bet = 0
         self.is_cpu = is_cpu
         self.active = True #Inactive when they fold
 
@@ -38,39 +43,111 @@ class PokerGame(BaseGame):
  
         
 class PokerManager(GameManager):
-    def __init__(self, factory, channel_id, user_id):
-        super().__init__(PokerGame(), PokerButtonsBase(self),
-                         channel_id, factory)
-        
-        # What is player_list? We have player_data (dict) in the game model
-        self.game.player_list.append(user_id)
+    def __init__(self, factory, channel, cpus):
+        super().__init__(game=PokerGame(cpus), base_gui=PokerButtonsBase(self),
+                         channel=channel, factory=factory)
 
-    async def create_game(self, interaction):
-        raise NotImplementedError("Override this method based on Poker specifications")
-    
+    async def add_player(self, interaction, init_player_data=None):
+        await super().add_player(interaction, init_player_data)
+        if interaction.user in self.game.player_data \
+        and interaction.user not in self.game.turn_order:
+            self.game.turn_order.append(interaction.user)
+
+    async def remove_player(self, interaction):
+        await super().remove_player(interaction)
+        if interaction.user not in self.game.player_data \
+        and interaction.user in self.game.turn_order:
+            self.game.turn_order.remove(interaction.user)
+        # if nobody else is left, then quit the game
+        if self.game.players == 0:
+            await self.quit_game(interaction)
+
     async def start_game(self, interaction):
+        if self.game.game_state != 1:
+            await send_info_message("This game has already started", interaction)
+            return
         # game_state == 4 -> players cannot join or leave
         self.game.game_state = 4
-        await self.gameplay_loop()
-        
+        # swap default GUI to betting phase buttons
+        await interaction.channel.send(f"{interaction.user.display_name} started the game!")
+        await self.deal_cards()
+
+    async def start_new_round(self, interaction):
+        for player in self.game.turn_order:
+            self.game.player_data[player].reset()
+        self.game.dealer_hand.clear()
+        self.game.dealer_hidden_card = None
+        self.game.player_turn = -1
+        self.game.game_state = 1
+        self.base_gui = BlackjackButtonsBase(self)
+        await self.resend(interaction)
+
+    async def deal_cards(self, interaction):
+        # make sure we're at the end of the betting phase
+        if self.game.game_state != 4:
+            return
+        # game_state 5 -> dealing phase (players cannot join or leave)
+        self.game.game_state = 5
+
+        await interaction.channel.send("Dealing cards...")
+
+        # draw 2 cards for every player
+        for i in self.game.player_data:
+            self.game.player_data[i].hand.extend(STANDARD_52_DECK.draw(2))
+
+        self.base_gui = ButtonsBetPhase(self, self.game.players)
+        await self.resend(interaction)
+
+    async def start_next_player_turn(self):
+        self.game.player_turn += 1
+        if self.game.player_turn == self.game.players:
+            await self.channel.send("All players have had their turn, starting dealer draw!")
+            self.game.game_state = 6
+            await self.dealer_draw()
+            return
+
+        active_player = self.game.get_active_player()
+        active_player_data = self.game.player_data[active_player]
+        active_player_hand = active_player_data.hand
+
+        (eleven_aces, value) = bj_add(active_player_hand)
+        if value == 21:
+            await self.channel.send(f"{active_player.mention} got blackjack! Moving on...")
+            active_player_data.current_payout_multiplier = 2.5
+            await self.start_next_player_turn()
+            return
+        active_player_data.hand_value = value
+        active_player_data.eleven_ace_count = eleven_aces
+
+        hit_me_view = HitOrStand(self, active_player)
+        active_msg = await self.channel.send((f"{active_player.mention}, your turn! Your hand is\n"
+                                        f"{cards_to_str_52_standard(active_player_hand)}\n"
+                                        "What would you like to do?"), view = hit_me_view)
+        await hit_me_view.wait()
+        await active_msg.edit(view=None)
+
     def get_base_menu_string(self):
         if self.game.game_state == 1:
-            return "Welcome to this game of Poker. Feel free to join."
+            return "Who's ready for a game of blackjack?"
+
         elif self.game.game_state == 4:
-            return "Game has started, placeholder string"
+            ret = "Current bets and chips:\n"
+            for player in self.game.turn_order:
+                player_data = self.game.player_data[player]
+                ret += f"{player.display_name}: {player_data.get_bet_phase_str()}\n"
+            return ret
 
-        
-    async def remove_all_players(self):
-        """
-        Removes all players from the players list
-        """
-        await self.factory.remove_players(self.game.player_list)
+        elif self.game.game_state == 5:
+            ret = f"Dealer hand: {cards_to_str_52_standard(self.game.dealer_hand)}"
+            # no hidden card means we added it to the dealer's hand
+            if self.game.dealer_hidden_card is not None:
+                ret += ", ??"
+            for player in self.game.turn_order:
+                player_data = self.game.player_data[player]
+                ret += f"\n{player.mention} {player_data.get_play_phase_str()}"
+            return ret
 
-    async def gameplay_loop(self):
-        """
-        The main gameplay loop for the Poker game
-        """
-        pass
+        return "You shouldn't be seeing this."
 
      
 class PokerButtonsBase(discord.ui.View):
@@ -164,39 +241,52 @@ class ViewHand(discord.ui.View):
             raise ValueError("Player hand must contain 2 cards")
         await interaction.response.send_message(f"Your hand is {str(current_player.hand[0])} and {str(current_player.hand[1])}", ephemeral = True, delete_after = 60)
 
-class DecideBet(discord.ui.View):
-    """
-    Button group to decide value of bet
-    Should be 5 buttons: +10, +1, -1, -10, and Done
-    """
-    def __init__(self, manager, min_bet = 0):
+class BetModal(discord.ui.Modal):
+    def __init__(self, manager):
+        super().__init__(title="Bet")
+        self.manager = manager
+
+    # apparently you just kind of put this down and it works
+    bet_box = discord.ui.TextInput(label="How much do you want to bet?",
+                                   max_length=4,
+                                   placeholder="Enter bet here...")
+
+    async def on_submit(self, interaction: discord.Interaction):
+        """
+        Overriden method that activates when the user submits the form.
+        """
+        # converts the user's response into a string
+        user_response = str(self.bet_box)
+        # make sure the bet is valid
+        if not user_response.isdigit():
+            print(f"{interaction.user} failed to bet with response {user_response}")
+            await send_info_message(f"{user_response} is not a valid number.", interaction)
+            return
+        print(f"{interaction.user} bet {user_response} chips.")
+        await self.manager.make_bet(interaction, user_response)
+
+
+class ButtonsBetPhase(discord.ui.View):
+    def __init__(self, manager, player_count):
         super().__init__()
         self.manager = manager
-        self.bet = 0
-        self.min_bet = min_bet
+        self.player_count = player_count
+        self.players_with_bets = 0
 
-    @discord.ui.button(label = "+10", style = discord.ButtonStyle.green)
-    async def plus_10(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def add_betted_player(self):
+        self.players_with_bets += 1
+        if self.players_with_bets == self.player_count:
+            await self.manager.deal_cards()
+
+    @discord.ui.button(label = "Bet!", style = discord.ButtonStyle.green)
+    async def bet(self, interaction: discord.Interaction, button: discord.ui.Button):
         """
-        Raise bet by 10
+        Allows the user to bring up the betting menu
         """
         print(f"{interaction.user} pressed {button.label}!")
-        # stop accepting interactions for this message
-        self.stop()
-        #TODO: raise bet by 10, should edit a message that shows the current bet
-        #TODO: add +1, -1, -10 buttons with very similar code.
-        if self.bet + 10 <= self.manager.game.player_data[interaction.user].chips:
-            self.bet += 10
-
-    @discord.ui.button(label = "Done", style = discord.ButtonStyle.blurple)
-    async def enter_bet(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """
-        Enter bet
-        """
-        print(f"{interaction.user} pressed {button.label}!")
-        # stop accepting interactions for this message
-        self.stop()
-        #TODO: enter bet, should move on to next person after bet is made
+        if not await self.manager.deny_non_participants(interaction):
+            return
+        await interaction.response.send_modal(BetModal(self.manager))
 
 class StandardTurnButtons(discord.ui.View):
     """
