@@ -58,7 +58,7 @@ class Deck:
         as a list.
         """
         ret_cards = []
-        for i in range(count):
+        for _ in range(count):
             ret_cards.append(self.cards[random.randint(0, self.single_deck_size - 1)])
         return ret_cards
 
@@ -69,6 +69,9 @@ STANDARD_52_DECK = Deck(('D', 'H', 'S', 'C'),
 
 
 def cards_to_str_52_standard(cards):
+    """
+    Converts a list of cards for a standard 52 deck to a string
+    """
     ret = ""
     for card in cards:
         ret += card.value
@@ -82,7 +85,11 @@ def cards_to_str_52_standard(cards):
             ret += ":clubs:, "
     return ret.rstrip(", ")
 
+
 def generate_deck():
+    """
+    pretty sure this is unused but I'm keeping it just in case
+    """
     deck = []
     for suit in ('H', 'D', 'S', 'C'):
         deck.append(Card(suit, 'A'))

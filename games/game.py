@@ -51,6 +51,9 @@ class BaseGame():
         return self.max_players > self.players
 
     def user_in_game(self, player):
+        """
+        Returns a bool indicating whether a player is in the game
+        """
         if self.game_state == 0:
             return True
         else:
@@ -154,7 +157,7 @@ class GameManager():
         the game
         """
         return self.game.user_in_game(player)
-    
+
     async def deny_non_participants(self, interaction):
         """
         Quick shortcut to deny players who are not in a game.

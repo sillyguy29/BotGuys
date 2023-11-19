@@ -40,7 +40,7 @@ class GameFactory():
             new_game = BlackjackManager(self, interaction.channel, cpus)
             self.active_games[interaction.channel_id] = new_game
             await new_game.create_game(interaction)
-            
+
         elif game_type == 3:
             new_game = UnoManager(self, interaction.channel, interaction.user)
             self.active_games[interaction.channel_id] = new_game

@@ -38,21 +38,17 @@ def create_commands(client):
         print(f"{interaction.user} used a slash command!")
         await interaction.response.send_message("Secret message", ephemeral=True)
 
-    # Help command, should load from text file help_info.txt into HELP_MESSAGE string
-    # Traditionally, discord bots DM the user with the help message.
-    # Right now, it is ephemeral.
-    with open('help_info.txt', 'r') as help_file:
-        HELP_MESSAGE = help_file.read()
     @client.tree.command(name="help", description="Learn about Lantern and its games")
     async def help_command(interaction: discord.Interaction):
         print(f"{interaction.user} used the help command!")
-        await interaction.response.send_message(HELP_MESSAGE, ephemeral=True)
+        await interaction.response.send_message("Check your DMs!", ephemeral=True)
+        await interaction.user.send(config.HELP_MESSAGE)
 
     @client.tree.command(name="counter", description="Play a simple counter game")
     async def play_counter(interaction: discord.Interaction):
         print(f"{interaction.user} is starting a game!")
         await client.game_factory.start_game(interaction, game_type=0)
-        
+
     @client.tree.command(name="blackjack", description="Play a game of Blackjack")
     @discord.app_commands.describe(
         cpus="Amount of cpu players (max of 3)"
@@ -60,7 +56,7 @@ def create_commands(client):
     async def play_blackjack(interaction: discord.Interaction, cpus: int):
         print(f"{interaction.user} is starting a game with {cpus} computer players!")
         await client.game_factory.start_game(interaction, game_type=1, cpus=cpus)
-        
+
     @client.tree.command(name="uno", description="Play a game of Uno")
     @discord.app_commands.describe(
         cpus="Amount of cpu players (max of 3)"
