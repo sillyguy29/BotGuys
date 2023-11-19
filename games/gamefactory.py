@@ -3,6 +3,7 @@
 from games.counter import CounterManager
 from games.blackjack import BlackjackManager
 from games.uno import UnoManager
+import datetime
 
 
 class GameFactory():
@@ -58,3 +59,28 @@ class GameFactory():
         in order to actually stop a game.
         """
         self.active_games.pop(channel_id)
+
+    async def get_debug_str(self, interaction, channel_id, print_type):
+        debug_str = f"DEBUG DATA\nRetrieved {datetime.datetime.now(datetime.timezone.est)}\n"
+        if channel_id is None:
+            for (k,v) in self.active_games.items():
+                debug_str += (f"CHANNEL ID: {k} AT "
+                              f"{datetime.datetime.now(datetime.timezone.est)}\n\n")
+                debug_str += v.get_debug_str()
+        else:
+            if channel_id not in self.active_games:
+                interaction.response.send_message("There is no game in this channel currently.")
+                return
+            debug_str += (f"CHANNEL ID: {channel_id} "
+                          f"AT {datetime.datetime.now(datetime.timezone.est)}\n\n")
+            debug_str += self.active_games[channel_id].get_debug_str()
+
+        if print_type == 1:
+            await interaction.response.send_message(debug_str)
+        elif print_type == 2:
+            print(debug_str)
+        elif print_type == 3:
+            date = str(datetime.datetime.now(datetime.timezone.est)).replace(":", " ")
+            fname = f"DEBUG_{date}.txt"
+            with open(fname, "w") as file:
+                file.write(debug_str)

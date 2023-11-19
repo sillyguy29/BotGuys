@@ -40,6 +40,14 @@ class BlackjackPlayer(BasePlayer):
         self.current_bet = 0
         self.current_payout_multiplier = 1
 
+    def get_debug_str(self):
+        return (f"\t\thand:{cards_to_str_52_standard(self.hand)}\n"
+                f"\t\televen_ace_count: {self.eleven_ace_count}\n"
+                f"\t\thand_value: {self.hand_value}\n"
+                f"\t\tchips: {self.chips}\n"
+                f"\t\tcurrent_bet: {self.current_bet}\n"
+                f"\t\tcurrent_payout_multiplier: {self.current_payout_multiplier}\n")
+
     def get_bet_phase_str(self):
         """
         Convert the player's stats to a string to be used during the
@@ -83,15 +91,31 @@ class BlackjackGame(BaseGame):
         self.turn_order = []
         self.dealer_hand = []
         self.dealer_hidden_card = None
-        self.player_turn = -1
+        self.turn_index = -1
 
     def get_active_player(self):
         """
         Returns the player whose turn it is, or None if not applicable
         """
-        if self.player_turn == -1:
+        if self.turn_index == -1:
             return None
-        return self.turn_order[self.player_turn]
+        return self.turn_order[self.turn_index]
+    
+    def get_debug_str(self):
+        ret = super().get_debug_str()
+        ret += ("Blackjack game attributes:\n"
+                f"\tturn_order: {self.turn_order}\n"
+                f"\tturn_index: {self.turn_index}\n"
+                f"\tdealer_hand: {cards_to_str_52_standard(self.dealer_hand)}\n"
+                f"\tdealer_hidden_card: {cards_to_str_52_standard(self.dealer_hidden_card)}\n")
+        ret += self.get_player_debug_strs()
+
+    def get_player_debug_strs(self):
+        ret = "Player data:\n"
+        for player in self.player_data:
+            ret += f"\tPlayer {player.display_name}:\n"
+            ret += self.player_data[player].get_debug_str()
+                
 
     #def __repr__(self):
 
@@ -141,7 +165,7 @@ class BlackjackManager(GameManager):
             self.game.player_data[player].reset()
         self.game.dealer_hand.clear()
         self.game.dealer_hidden_card = None
-        self.game.player_turn = -1
+        self.game.turn_index = -1
         self.game.game_state = 1
         # allow players to join
         self.base_gui = BlackjackButtonsBase(self)
@@ -202,9 +226,9 @@ class BlackjackManager(GameManager):
         """
         Start the next player's turn
         """
-        self.game.player_turn += 1
+        self.game.turn_index += 1
         # if we made it to the end of the list, have the dealer go
-        if self.game.player_turn == self.game.players:
+        if self.game.turn_index == self.game.players:
             await self.channel.send("All players have had their turn, starting dealer draw!")
             self.game.game_state = 6
             await self.dealer_draw()
@@ -433,6 +457,9 @@ class BlackjackManager(GameManager):
         active_msg = await self.channel.send("Play again?", view=restart_ui)
         await restart_ui.wait()
         await active_msg.edit(view=None)
+
+    def get_debug_str(self):
+        return super().get_debug_str() + self.game.get_debug_str()
 
 
 class QuitGameButton(discord.ui.View):

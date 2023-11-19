@@ -65,6 +65,15 @@ def create_commands(client):
         print(f"{interaction.user} is starting a game with {cpus} computer players!")
         await client.game_factory.start_game(interaction, game_type=3, cpus=cpus)
 
+    @client.tree.command(name="getdebugdata", description="Get internal data for one or all games")
+    @discord.app_commands.describe(
+        channel_id="ID of the channel with an active game to get data from, leave blank to get all"
+        print_type="1: print results here, 2: print results in terminal, 3: write to file (def=2)"
+    )
+    async def get_debug(interaction: discord.Interaction, channel_id: Optional[int] = None,
+                         print_type: Optional[int] = 2):
+        await client.game_factory.get_debug_str(interaction, channel_id, print_type)
+
 
 def run_bot():
     """

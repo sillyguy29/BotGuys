@@ -5,6 +5,7 @@ control basic things that exist for all game types, such as starting,
 players joining/leaving, ending the game, etc
 """
 import discord
+from util import send_info_message
 
 class BasePlayer():
     """
@@ -13,12 +14,19 @@ class BasePlayer():
     def __init__(self):
         return
 
+    def get_debug_str(self):
+        """
+        yadda yadda
+        """
+        return ""
+
 
 class BaseGame():
     """
     Game model class. Member vars should only be accessed by its manager or AI functions.
     """
-    def __init__(self, game_type=0, player_data=None, game_state=0, user_id=None, players=0, cpus=0, max_players=0):
+    def __init__(self, game_type=0, player_data=None, game_state=0, 
+                 user_id=None, players=0, cpus=0, max_players=0):
         # ID value of the game type
         self.game_type = game_type
         # list of players engaged with this game
@@ -58,6 +66,25 @@ class BaseGame():
             return True
         else:
             return player in self.player_data
+
+    def get_active_player(self):
+        """
+        Get the player whose turn it is, or none if there is no turn
+        order currently
+        """
+        return None
+
+    def get_debug_str(self):
+        """
+        Returns a string with all members of the class for debug
+        """
+        return ("Base game attributes:\n"
+        f"\tgame_type: {self.game_type}\n"
+        f"\tuser_id: {self.user_id}\n"
+        f"\tplayers: {self.players}\n"
+        f"\tcpus: {self.cpus}\n"
+        f"\tgame_state: {self.game_state}\n"
+        f"\tmax_players: {self.max_players}\n")
 
 
 class GameManager():
@@ -158,6 +185,13 @@ class GameManager():
         """
         return self.game.user_in_game(player)
 
+    def get_active_player(self):
+        """
+        Returns the user object of whoever's turn it is in the game,
+        none if there is no turn order
+        """
+        return self.game.get_active_player()
+
     async def deny_non_participants(self, interaction):
         """
         Quick shortcut to deny players who are not in a game.
@@ -235,4 +269,47 @@ class GameManager():
             return True
         # False -> game has not ended
         return False
- 
+
+    async def interaction_is_valid(self, interaction=None, turn_order=False,
+                                   in_game=True, game_end=True):
+        """
+        Runs through a series of checks to determine if an interaction
+        is valid. Responds to the interaction and returns False if this
+        interaction was not valid. Prevents unexpected interactions
+        from modifying state.
+
+        Arguments are the various types of checks that this function
+        performs. Here are the checks:
+        - turn_order: Defaults to False. Checks if it's the player's
+        turn.
+        - in_game: Defaults to True. Checks if the player is in the
+        game.
+        - game_end: defaults to True. Checks if the game has ended.
+        """
+        if interaction is None:
+            return False
+
+        if game_end:
+            if self.game.game_state == -1:
+                await send_info_message("This game has ended.", interaction)
+                return False
+
+        if in_game:
+            if not self.user_in_game(interaction.user):
+                await send_info_message("You are not in this game.", interaction)
+                return False
+
+        if turn_order:
+            if self.get_active_player() != interaction.user:
+                await send_info_message("It's not your turn.", interaction)
+                return False
+
+        return True
+
+    def get_debug_str(self):
+        """
+        Returns a string with all members of the class for debug
+        """
+        return ("Base manager:\n"
+                f"\tbase_gui: {self.base_gui}\n"
+                f"\tchannel id: {self.channel.id}\n" + self.game.get_debug_str())
