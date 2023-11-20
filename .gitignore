@@ -159,7 +159,10 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-#ignore the file with the bot's token, and the guild id
+# ignore the file with the bot's token, and the guild id
 bot_token.txt
 guild_id.txt
 *.json
+
+# ignore logs
+logs/

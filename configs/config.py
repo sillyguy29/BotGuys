@@ -1,10 +1,12 @@
 # Initialize important global variables
-token_file = open("configs/bot_token.txt", "r")
-global TOKEN
-TOKEN = token_file.read()
-token_file.close()
+with open("configs/bot_token.txt", mode="r", encoding="utf-8") as token_file:
+    global TOKEN
+    TOKEN = token_file.read()
 
-id_file = open("configs/guild_id.txt", "r")
-global GUILD_ID
-GUILD_ID = int(id_file.read())
-id_file.close()
+with open("configs/guild_id.txt", mode="r", encoding="utf-8") as id_file:
+    global GUILD_ID
+    GUILD_ID = int(id_file.read())
+
+with open("configs/help_info.txt", mode="r", encoding="utf-8") as help_file:
+    global HELP_MESSAGE
+    HELP_MESSAGE = help_file.read()
