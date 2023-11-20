@@ -7,6 +7,6 @@ with open("configs/guild_id.txt", mode="r", encoding="utf-8") as id_file:
     global GUILD_ID
     GUILD_ID = int(id_file.read())
 
-with open("configs/help_info.txt", mode="r", encoding="utf-8") as help_file:
+with open("configs/help_info.md", mode="r", encoding="utf-8") as help_file:
     global HELP_MESSAGE
     HELP_MESSAGE = help_file.read()
