@@ -4,16 +4,15 @@ Contains all the logic needed to run a game of Blackjack.
 It features an closed game model, meaning not all users can interact
 with the game at any time, and there is player management.
 """
+import logging
 import discord
 from games.game import BaseGame
 from games.game import GameManager
 from games.game import BasePlayer
-from util import Card
 from util import double_check
 from util import STANDARD_52_DECK
 from util import cards_to_str_52_standard
 from util import send_info_message
-import random
 
 
 class BlackjackPlayer(BasePlayer):
@@ -41,7 +40,7 @@ class BlackjackPlayer(BasePlayer):
         self.current_payout_multiplier = 1
 
     def get_debug_str(self):
-        return (f"\t\thand:{cards_to_str_52_standard(self.hand)}\n"
+        return (f"\t\thand: {self.hand}\n"
                 f"\t\televen_ace_count: {self.eleven_ace_count}\n"
                 f"\t\thand_value: {self.hand_value}\n"
                 f"\t\tchips: {self.chips}\n"
@@ -100,22 +99,23 @@ class BlackjackGame(BaseGame):
         if self.turn_index == -1:
             return None
         return self.turn_order[self.turn_index]
-    
+
     def get_debug_str(self):
         ret = super().get_debug_str()
         ret += ("Blackjack game attributes:\n"
                 f"\tturn_order: {self.turn_order}\n"
                 f"\tturn_index: {self.turn_index}\n"
-                f"\tdealer_hand: {cards_to_str_52_standard(self.dealer_hand)}\n"
-                f"\tdealer_hidden_card: {cards_to_str_52_standard(self.dealer_hidden_card)}\n")
+                f"\tdealer_hand: {self.dealer_hand}\n"
+                f"\tdealer_hidden_card: {self.dealer_hidden_card}\n")
         ret += self.get_player_debug_strs()
+        return ret
 
     def get_player_debug_strs(self):
         ret = "Player data:\n"
         for player in self.player_data:
             ret += f"\tPlayer {player.display_name}:\n"
             ret += self.player_data[player].get_debug_str()
-                
+        return ret
 
     #def __repr__(self):
 

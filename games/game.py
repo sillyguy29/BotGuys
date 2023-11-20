@@ -4,6 +4,7 @@ Defines abstract classes for the model and manager which are used to
 control basic things that exist for all game types, such as starting,
 players joining/leaving, ending the game, etc
 """
+import logging
 import discord
 from util import send_info_message
 
@@ -312,4 +313,4 @@ class GameManager():
         """
         return ("Base manager:\n"
                 f"\tbase_gui: {self.base_gui}\n"
-                f"\tchannel id: {self.channel.id}\n" + self.game.get_debug_str())
+                f"\tchannel id: {self.channel.id}\n")

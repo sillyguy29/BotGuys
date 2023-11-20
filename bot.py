@@ -7,6 +7,8 @@ import discord
 import cmd_control
 from configs import config
 from games import gamefactory
+import logging
+import datetime
 
 
 # Inherit the discord client class so we can override some methods
@@ -67,15 +69,18 @@ def create_commands(client):
 
     @client.tree.command(name="getdebugdata", description="Get internal data for one or all games")
     @discord.app_commands.describe(
-        channel_id="ID of the channel with an active game to get data from, leave blank to get all"
-        print_type="1: print results here, 2: print results in terminal, 3: write to file (def=2)"
+        channel_id=("The ID of the channel with an active game to get the"
+                    " data from, leave blank to get all game data"),
+        print_type=("Number indicating where to send the results."
+                    " 1: print results here, 2: print results "
+                    "in terminal, 3: write to file (default=2)")
     )
-    async def get_debug(interaction: discord.Interaction, channel_id: Optional[int] = None,
-                         print_type: Optional[int] = 2):
+    async def get_debug(interaction: discord.Interaction, channel_id: int = None,
+                         print_type: int = 2):
         await client.game_factory.get_debug_str(interaction, channel_id, print_type)
 
 
-def run_bot():
+def run_bot(file_handler, cmd_loglevel):
     """
     Called by main, starts the bot
     """
@@ -86,10 +91,8 @@ def run_bot():
 
     @client.event
     async def on_ready():
-        print(f"{client.user} is now running")
+        print(f"{client.user} is now running!")
 
-
-    #discord.utils.setup_logging(level=logging.INFO)
-
-
-    client.run(config.TOKEN)
+    # command-line logger
+    discord.utils.setup_logging(level=cmd_loglevel)
+    client.run(config.TOKEN, log_handler=file_handler)

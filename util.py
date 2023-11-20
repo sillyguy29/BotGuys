@@ -19,10 +19,13 @@ class Card:
     def __eq__(self, other):
         return self.name == other.name\
                 and self.value == other.value\
-    
+
     def __str__(self):
         return str(self.name) + str(self.value)
-    
+
+    def __repr__(self):
+        return "<name=" + str(self.name) + " value=" + str(self.value) + ">"
+
 class Deck:
     """
     Contains cards and their weights to make drawing easy. Due to
@@ -72,6 +75,8 @@ def cards_to_str_52_standard(cards):
     """
     Converts a list of cards for a standard 52 deck to a string
     """
+    if cards is None:
+        return "Empty"
     ret = ""
     for card in cards:
         ret += card.value
