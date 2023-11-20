@@ -4,19 +4,21 @@ Contains all the logic needed to run a game of Blackjack.
 It features an closed game model, meaning not all users can interact
 with the game at any time, and there is player management.
 """
+import logging
 import discord
 from games.game import BaseGame
 from games.game import GameManager
 from games.game import BasePlayer
-from util import Card
 from util import double_check
 from util import STANDARD_52_DECK
 from util import cards_to_str_52_standard
 from util import send_info_message
-import random
 
 
 class BlackjackPlayer(BasePlayer):
+    """
+    Blackjack player class, contains everything specific to a player
+    """
     def __init__(self):
         super().__init__()
 
@@ -28,16 +30,35 @@ class BlackjackPlayer(BasePlayer):
         self.current_payout_multiplier = 1
 
     def reset(self):
+        """
+        Reset the player's stats after a game ends
+        """
         self.hand.clear()
         self.eleven_ace_count = 0
         self.hand_value = 0
         self.current_bet = 0
         self.current_payout_multiplier = 1
 
+    def get_debug_str(self):
+        return (f"\t\thand: {self.hand}\n"
+                f"\t\televen_ace_count: {self.eleven_ace_count}\n"
+                f"\t\thand_value: {self.hand_value}\n"
+                f"\t\tchips: {self.chips}\n"
+                f"\t\tcurrent_bet: {self.current_bet}\n"
+                f"\t\tcurrent_payout_multiplier: {self.current_payout_multiplier}\n")
+
     def get_bet_phase_str(self):
+        """
+        Convert the player's stats to a string to be used during the
+        betting phase
+        """
         return f"Chips: {self.chips}, Bet: {self.current_bet}"
-    
+
     def get_play_phase_str(self):
+        """
+        Convert the player's stats to a string to be used during the
+        play phase
+        """
         if self.current_payout_multiplier == 2.5:
             return (f"({self.chips} chips, {self.current_bet} bet): "
                     f"{cards_to_str_52_standard(self.hand)} BLACKJACK!")
@@ -47,12 +68,15 @@ class BlackjackPlayer(BasePlayer):
         else:
             return (f"({self.chips} chips, {self.current_bet} bet): "
                     f"{cards_to_str_52_standard(self.hand)}")
-        
+
     def get_payout_str(self):
+        """
+        Convert the player's stats into a string showing the player's
+        payout for the round. Does not modify player stats.
+        """
         return (f"{self.current_bet} x {self.current_payout_multiplier} = "
                 f"{round(self.current_bet * self.current_payout_multiplier)} + {self.chips} = "
                 f"{round(self.current_bet * self.current_payout_multiplier) + self.chips}")
-        
 
 
 class BlackjackGame(BaseGame):
@@ -66,20 +90,40 @@ class BlackjackGame(BaseGame):
         self.turn_order = []
         self.dealer_hand = []
         self.dealer_hidden_card = None
-        self.player_turn = -1
+        self.turn_index = -1
 
     def get_active_player(self):
         """
         Returns the player whose turn it is, or None if not applicable
         """
-        if self.player_turn == -1:
+        if self.turn_index == -1:
             return None
-        return self.turn_order[self.player_turn]
+        return self.turn_order[self.turn_index]
+
+    def get_debug_str(self):
+        ret = super().get_debug_str()
+        ret += ("Blackjack game attributes:\n"
+                f"\tturn_order: {self.turn_order}\n"
+                f"\tturn_index: {self.turn_index}\n"
+                f"\tdealer_hand: {self.dealer_hand}\n"
+                f"\tdealer_hidden_card: {self.dealer_hidden_card}\n")
+        ret += self.get_player_debug_strs()
+        return ret
+
+    def get_player_debug_strs(self):
+        ret = "Player data:\n"
+        for player in self.player_data:
+            ret += f"\tPlayer {player.display_name}:\n"
+            ret += self.player_data[player].get_debug_str()
+        return ret
 
     #def __repr__(self):
- 
-        
+
+
 class BlackjackManager(GameManager):
+    """
+    Blackjack manager class
+    """
     def __init__(self, factory, channel, cpus):
         super().__init__(game=BlackjackGame(cpus), base_gui=BlackjackButtonsBase(self),
                          channel=channel, factory=factory)
@@ -100,6 +144,9 @@ class BlackjackManager(GameManager):
             await self.quit_game(interaction)
 
     async def start_game(self, interaction):
+        """
+        Start the game
+        """
         if self.game.game_state != 1:
             await send_info_message("This game has already started", interaction)
             return
@@ -111,16 +158,23 @@ class BlackjackManager(GameManager):
         await self.resend(interaction)
 
     async def start_new_round(self, interaction):
+        """
+        Reset the game state to player join phase
+        """
         for player in self.game.turn_order:
             self.game.player_data[player].reset()
         self.game.dealer_hand.clear()
         self.game.dealer_hidden_card = None
-        self.game.player_turn = -1
+        self.game.turn_index = -1
         self.game.game_state = 1
+        # allow players to join
         self.base_gui = BlackjackButtonsBase(self)
         await self.resend(interaction)
 
     async def deal_cards(self):
+        """
+        Deals cards to all players, used once betting is done
+        """
         # make sure we're at the end of the betting phase
         if self.game.game_state != 4:
             return
@@ -131,13 +185,16 @@ class BlackjackManager(GameManager):
 
         # draw 2 cards for the dealer and every player
         self.game.dealer_hand.extend(STANDARD_52_DECK.draw(1))
+        # the dealer's hidden card is stored seperately
         hidden_card = STANDARD_52_DECK.draw(1)[0]
         self.game.dealer_hidden_card = hidden_card
         for i in self.game.player_data:
             self.game.player_data[i].hand.extend(STANDARD_52_DECK.draw(2))
 
+        # check to see if the dealer got a natural 21 and add the
+        # hidden card to its normal hand if so (so it shows up in
+        # the base menu)
         dealer_card = self.game.dealer_hand[0]
-        # multiline conditional syntax
         if (dealer_card.value == "A" and hidden_card.value in ("J", "Q", "K") or
             hidden_card.value == "A" and dealer_card.value in ("J", "Q", "K")
         ):
@@ -150,30 +207,41 @@ class BlackjackManager(GameManager):
         if  self.game.game_state == -1:
             return
         await self.current_active_menu.edit(view=None)
+        # if dealer's hidden card is None, that means we added it to
+        # its hand because it got blackjack
         if self.game.dealer_hidden_card is None:
             self.current_active_menu = await self.channel.send(self.get_base_menu_string(),
                                                                view=None, silent=True)
             self.channel.send("Dealer got blackjack! House wins!")
+            # move straight to payout phase
             self.make_payout(21)
         else:
+            # otherwise initiate play phase
             self.base_gui = BlackjackButtonsBaseGame(self)
             self.current_active_menu = await self.channel.send(self.get_base_menu_string(),
                                                                view=self.base_gui, silent=True)
             await self.start_next_player_turn()
 
     async def start_next_player_turn(self):
-        self.game.player_turn += 1
-        if self.game.player_turn == self.game.players:
+        """
+        Start the next player's turn
+        """
+        self.game.turn_index += 1
+        # if we made it to the end of the list, have the dealer go
+        if self.game.turn_index == self.game.players:
             await self.channel.send("All players have had their turn, starting dealer draw!")
             self.game.game_state = 6
             await self.dealer_draw()
             return
 
+        # retrieving data
         active_player = self.game.get_active_player()
         active_player_data = self.game.player_data[active_player]
         active_player_hand = active_player_data.hand
 
         (eleven_aces, value) = bj_add(active_player_hand)
+        # if the player got a blackjack, skip their turn and give them
+        # a 2.5x payout immediately
         if value == 21:
             await self.channel.send(f"{active_player.mention} got blackjack! Moving on...")
             active_player_data.current_payout_multiplier = 2.5
@@ -182,10 +250,13 @@ class BlackjackManager(GameManager):
         active_player_data.hand_value = value
         active_player_data.eleven_ace_count = eleven_aces
 
+        # initiate the hit or stand menu
         hit_me_view = HitOrStand(self, active_player)
         active_msg = await self.channel.send((f"{active_player.mention}, your turn! Your hand is\n"
                                         f"{cards_to_str_52_standard(active_player_hand)}\n"
                                         "What would you like to do?"), view = hit_me_view)
+        # wait for the user to press hit or stand, then remove the
+        # buttons from the menu once they do
         await hit_me_view.wait()
         await active_msg.edit(view=None)
 
@@ -219,17 +290,21 @@ class BlackjackManager(GameManager):
         # check to make sure the game hasn't ended, do nothing if it has
         if await self.game_end_check(interaction):
             return
-        
+
+        # check to make sure they're in the game
         if interaction.user not in self.game.player_data:
             await send_info_message("You are not in this game.", interaction)
             return
 
+        # note: we don't check to see if this is the player's turn,
+        # so ensure that check is done before we get here
         active_player = interaction.user
         active_player_data = self.game.player_data[interaction.user]
         new_card = STANDARD_52_DECK.draw(1)[0]
         active_player_data.hand.append(new_card)
         response_message = f"{active_player.mention} drew {cards_to_str_52_standard([new_card])}! "
 
+        # manage add the card's value to the player's hand
         if new_card.value == "A":
             active_player_data.hand_value += 11
             active_player_data.eleven_ace_count += 1
@@ -238,11 +313,16 @@ class BlackjackManager(GameManager):
         else:
             active_player_data.hand_value += int(new_card.value)
 
+        # reduce the value of any aces while the user is above 21,
+        # and if they are still above 21 when all aces are reduced,
+        # declare that they're gone bust
         while active_player_data.hand_value > 21:
             if active_player_data.eleven_ace_count > 0:
                 active_player_data.hand_value -= 10
                 active_player_data.eleven_ace_count -= 1
             else:
+                # if the user busts, we set their payout to 0, which
+                # is never overwritten even if the dealer busts too
                 response_message += "That's a bust!"
                 active_player_data.current_payout_multiplier = 0
                 await interaction.response.send_message(response_message)
@@ -254,17 +334,22 @@ class BlackjackManager(GameManager):
             await interaction.response.send_message(response_message)
             await self.start_next_player_turn()
             return
-        
+
+        # alert players of the new draw and allow them to go again
         response_message += (f"\nTheir hand is now "
                              f"{cards_to_str_52_standard(active_player_data.hand)}, "
                              f"which has a max value of {active_player_data.hand_value}! ")
         response_message += "What next?"
         hit_me_view = HitOrStand(self, active_player)
         active_msg = await self.channel.send(response_message, view=hit_me_view)
+        # wait for the buttons to be pressed and remove once one has
         await hit_me_view.wait()
         await active_msg.edit(view=None)
 
     async def make_bet(self, interaction, bet_amount):
+        """
+        Set a player's bet
+        """
         # checks to see if the game is over
         if await self.game_end_check(interaction):
             return
@@ -292,22 +377,29 @@ class BlackjackManager(GameManager):
                                         f"chips and now has {str(user_data.chips)} "
                                         "chips left!"))
         # Update the view so it knows how many players have bet
-        # TODO: this solution is janky as fuck pls fix
+        # TODO: this solution is janky as fuck pls fix maybe
         await self.base_gui.add_betted_player()
         return
-    
+
     async def dealer_draw(self):
+        """
+        Perform the dealer's play
+        """
+        # reveal the dealer's hidden card if it hasn't been already
+        # note: this check is probably worthless since the only case in
+        # which it isn't hidden skips this phase
         if self.game.dealer_hidden_card is not None:
             await self.channel.send((f"Dealer's hidden card is "
                                f"{cards_to_str_52_standard([self.game.dealer_hidden_card])}!"))
             self.game.dealer_hand.append(self.game.dealer_hidden_card)
             self.game.dealer_hidden_card = None
 
-        (eleven_aces, hand_value) = bj_add(self.game.dealer_hand)
+        (_, hand_value) = bj_add(self.game.dealer_hand)
         await self.channel.send((f"Dealer's hand is "
                                     f"{cards_to_str_52_standard(self.game.dealer_hand)}, "
                                     f"which has a total value of {hand_value}!"))
 
+        # keep drawing until the deal exceeds 17 cards (bust or not)
         while hand_value < 17:
             new_card = STANDARD_52_DECK.draw(1)
             await self.channel.send(f"Dealer drew {cards_to_str_52_standard(new_card)}!")
@@ -329,6 +421,8 @@ class BlackjackManager(GameManager):
                                      f"{cards_to_str_52_standard(self.game.dealer_hand)}, "
                                      f"which has a total value of {hand_value}!"))
 
+        # treat dealer's hand as 0 if it busts (so any non-busted
+        # player is treated as winning)
         if hand_value > 21:
             await self.channel.send("Dealer bust!")
             hand_value = 0
@@ -336,9 +430,16 @@ class BlackjackManager(GameManager):
         await self.make_payout(hand_value)
 
     async def make_payout(self, dealer_hand_value):
+        """
+        Check through game player list, compare it to the dealer's hand
+        value, and make payment accordingly
+        """
         payout_str = "Game payouts:"
         for player in self.game.turn_order:
             player_data = self.game.player_data[player]
+            # if the payout multiplier is 1, then the user hasn't had
+            # its payment determined yet through bust or blackjack, so
+            # we need to compare it to the dealer's hand
             if player_data.current_payout_multiplier == 1:
                 if player_data.hand_value > dealer_hand_value:
                     player_data.current_payout_multiplier = 2
@@ -350,14 +451,21 @@ class BlackjackManager(GameManager):
 
         await self.channel.send(payout_str)
 
+        # then initiate the endgame phase
         self.game.game_state = 7
         restart_ui = QuitGameButton(self)
         active_msg = await self.channel.send("Play again?", view=restart_ui)
         await restart_ui.wait()
         await active_msg.edit(view=None)
 
+    def get_debug_str(self):
+        return super().get_debug_str() + self.game.get_debug_str()
+
 
 class QuitGameButton(discord.ui.View):
+    """
+    Button set that asks players if they want to play the game again
+    """
     def __init__(self, manager):
         super().__init__()
         self.manager = manager
@@ -370,7 +478,7 @@ class QuitGameButton(discord.ui.View):
         # print when someone presses the button because otherwise
         # pylint won't shut up about button being unused
         print(f"{interaction.user} pressed {button.label}!")
-        # remove current players from active player list
+        # stop accepting input
         self.stop()
         await self.manager.start_new_round(interaction)
 
@@ -382,13 +490,16 @@ class QuitGameButton(discord.ui.View):
         # print when someone presses the button because otherwise
         # pylint won't shut up about button being unused
         print(f"{interaction.user} pressed {button.label}!")
-        # remove current players from active player list
+        # stop eccepting input
         self.stop()
         await interaction.channel.send(f"{interaction.user.mention} ended the game!")
         await self.manager.quit_game(interaction)
 
 
 class BlackjackButtonsBase(discord.ui.View):
+    """
+    Initial "join game" buttons
+    """
     def __init__(self, manager):
         super().__init__()
         self.manager = manager
@@ -433,6 +544,9 @@ class BlackjackButtonsBase(discord.ui.View):
 
 
 class BlackjackButtonsBaseGame(discord.ui.View):
+    """
+    Literally just a resend button
+    """
     def __init__(self, manager):
         super().__init__()
         self.manager = manager
@@ -450,6 +564,9 @@ class BlackjackButtonsBaseGame(discord.ui.View):
 
 
 class BetModal(discord.ui.Modal):
+    """
+    Contains the popup box that shows when players make their bets
+    """
     def __init__(self, manager):
         super().__init__(title="Bet")
         self.manager = manager
@@ -475,6 +592,10 @@ class BetModal(discord.ui.Modal):
 
 
 class ButtonsBetPhase(discord.ui.View):
+    """
+    Contains the "bet" button and also keeps track of players who have
+    placed bets
+    """
     def __init__(self, manager, player_count):
         super().__init__()
         self.manager = manager
@@ -482,6 +603,10 @@ class ButtonsBetPhase(discord.ui.View):
         self.players_with_bets = 0
 
     async def add_betted_player(self):
+        """
+        Add a player to the bet count, once all players have bet,
+        the manager moves to the dealing phase
+        """
         self.players_with_bets += 1
         if self.players_with_bets == self.player_count:
             await self.manager.deal_cards()
@@ -499,7 +624,9 @@ class ButtonsBetPhase(discord.ui.View):
 
 class HitOrStand(discord.ui.View):
     """
-    Button group used for the Blackjack game when the user can Hit or Stand as their options
+    Contains the "hit" and "stand" buttons when it's a certain player's
+    turn. Keeps track of which player's turn it is and denies input
+    to other players
     """
     def __init__(self, manager, active_player):
         super().__init__()
@@ -553,7 +680,7 @@ def bj_add(cards):
             ace_count += 1
     total += 11 * ace_count
     ret_ace_count = ace_count
-    for ace in range(ace_count):
+    for _ in range(ace_count):
         if total > 21:
             ret_ace_count -= 1
             total -= 10
