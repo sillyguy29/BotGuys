@@ -23,8 +23,6 @@ class UnoPlayer(BasePlayer):
         playable_cards = [card for card in self.hand if card.name == top_card.name or card.value == top_card.value or card.name == "Wild"]
         return playable_cards
         
-    
-
 
 class UnoGame(BaseGame):
     """
@@ -110,11 +108,16 @@ class UnoManager(GameManager):
         for i in range(num_cards):
             if len(self.game.deck) == 0: 
                 await self.announce("The deck is empty! Shuffling in the discard pile...")
-                self.regenerateDeck()
+                self.regenerate_deck()
             card = self.game.deck.pop()
             player.hand.append(card)
             player.hand = sorted(player.hand)
         if num_cards == 1: return card
+    
+    def regenerate_deck(self):
+        random.shuffle(self.game.discard)
+        self.game.deck += self.game.discard 
+        self.game.discard.clear()
     
     def get_player_hand(self, player):
         return self.game.player_data[player].hand
@@ -155,6 +158,7 @@ class UnoManager(GameManager):
             view = UnoWildCard(self) # Menu to inquire what the next card is
             await interaction.response.send_message("Choose a color!", view = view, ephemeral=True, delete_after=10)
             await view.wait()
+            await interaction.delete_original_response()
         else: # Not wild, just replace
             self.game.top_card = card
         # If card is "Skip", "Draw Two", or "Draw Four", you will need a victim
@@ -209,9 +213,6 @@ class UnoManager(GameManager):
 
     async def announce(self, announcement):
         await self.channel.send(announcement, delete_after=10)
-
-
-
 
 
          #######################################################
@@ -337,16 +338,6 @@ class CardButton(discord.ui.Button):
         view: UnoCardButtons = self.view
         await self.manager.play_card(interaction, self.card)
         view.stop()
-        if (self.card.name != "Wild"):
-            await interaction.response.send_message(f"You played {color_to_emoji(self.card)} {self.card.value}", ephemeral = True,
-                                                delete_after = 2)
-        else:
-            print("asdfghjkl")
-            # Due to interactions only being able to be responded to once,
-            # I had to create this conditional statement to handle 
-            # wild cards, since we use the one-time interaction to send
-            # a menu to inquire a color choice. I don't know how to fix
-            # this issue at the moment. 
 
 
 class UnoWildCard(discord.ui.View):
@@ -472,5 +463,3 @@ def color_to_emoji(card):
     elif card.name == "Wild":
         return "🌈"
     return "🟣"
-
-
