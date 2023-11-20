@@ -73,7 +73,7 @@ class UnoManager(GameManager):
         # swap default GUI to active game buttons
         self.base_gui = UnoButtonsBaseGame(self)
         # setup the game board
-        self.setup()
+        await self.setup()
         await self.resend(interaction)
         
     def get_base_menu_string(self):
@@ -84,11 +84,11 @@ class UnoManager(GameManager):
             return output
         return "Game has started!"
        
-    def setup(self):
+    async def setup(self):
         print("Entering setup...")
         # Each player gets 7 cards to start
         for i in self.game.player_data:
-            self.draw_cards(self.game.player_data[i], 7)
+            await self.draw_cards(self.game.player_data[i], 7)
         # Assign the top-card. The game cannot begin on a "Reverse", "Skip", "Draw Two", or "Wild"
         while True:
             self.game.top_card = self.game.deck.pop()
@@ -106,15 +106,15 @@ class UnoManager(GameManager):
         random.shuffle(self.game.turn_order)
         self.game.turn_index = random.randint(0, len(self.game.turn_order)-1)
 
-    def draw_cards(self, player, num_cards=1):
+    async def draw_cards(self, player, num_cards=1):
         for i in range(num_cards):
             if len(self.game.deck) == 0: 
-                self.announce("The deck is empty! Shuffling in the discard pile...")
+                await self.announce("The deck is empty! Shuffling in the discard pile...")
                 self.regenerateDeck()
             card = self.game.deck.pop()
             player.hand.append(card)
             player.hand = sorted(player.hand)
-        if num_cards == 1: return str(card)
+        if num_cards == 1: return card
     
     def get_player_hand(self, player):
         return self.game.player_data[player].hand
@@ -146,8 +146,17 @@ class UnoManager(GameManager):
             return next_player
     
     async def play_card(self, interaction, card):
-        self.game.discard.append(self.game.top_card)
-        self.game.top_card = card
+        # We put add the top card to the discard pile, 
+        # but only if it's not a placeholder card        
+        if (self.game.top_card.value != "Card"):
+            self.game.discard.append(self.game.top_card)
+        # Then we can replace the top card with the played card, unless it's wild
+        if (card.name == "Wild"): 
+            view = UnoWildCard(self) # Menu to inquire what the next card is
+            await interaction.response.send_message("Choose a color!", view = view, ephemeral=True, delete_after=10)
+            await view.wait()
+        else: # Not wild, just replace
+            self.game.top_card = card
         # If card is "Skip", "Draw Two", or "Draw Four", you will need a victim
         victim_user = self.game.turn_order[self.get_next_turn_index()]
         victim_name = victim_user.display_name
@@ -155,32 +164,31 @@ class UnoManager(GameManager):
         # If "Reverse" card was played, reverse the queue
         if card.value == "Reverse":
             self.game.reversed = not self.game.reversed
-            self.announce("Reversing the turn order!")
-        # If "Wild" card is played, inquire what color is next
-        if card.name == "Wild":
-            view = UnoWildCard(self)
-            await interaction.response.send_message("Choose a color!", view = view, ephemeral = True)
+            await self.announce("Reversing the turn order!")
         # If "Skip" was played, flag them as 'skipped'
         if card.value == "Skip":
-            self.announce(victim_name + " got skipped! LOL!")
+            await self.announce(victim_name + " got skipped! LOL!")
             victim_unoplayer.skipped = True
         # If "Draw Two" was played, make next player draw two cards
         #    and then flag them as 'skipped'
         if card.value == "Draw Two":
-            self.announce(victim_name + " eats two cards! LMAO!")
-            self.draw_cards(victim_unoplayer, 2)
+            await self.announce(victim_name + " eats two cards! LMAO!")
+            await self.draw_cards(victim_unoplayer, 2)
             victim_unoplayer.skipped = True
         # If "Draw Four" was played, make next player draw four cards
         #    and then flag them as 'skipped'
         if card.value == "Draw Four":
-            self.announce(victim_name + " eats four cards! ROFL!!")
-            self.draw_cards(victim_unoplayer, 4)
+            await self.announce(victim_name + " eats four cards! ROFL!!")
+            await self.draw_cards(victim_unoplayer, 4)
             victim_unoplayer.skipped = True
         # Remove the played card from the player's hand
         player = self.game.player_data[interaction.user]
         player.hand.remove(card)
         if len(player.hand) == 1:
-            self.announce("Oh fuck! " + player.display_name + " has only one card left!")
+            await self.announce("Oh fuck! " + interaction.user.display_name + " has only one card left!")
+        if len(player.hand) == 0:
+            await self.announce(interaction.user.display_name + " won! Game game, nerds.")
+            self.quit_game(interaction) 
         # Go to next turn
         await self.next_turn()
 
@@ -198,7 +206,6 @@ class UnoManager(GameManager):
         # Refresh the base GUI
         await self.current_active_menu.edit(content=self.get_base_menu_string(),
                                             view=self.base_gui)
-
 
     async def announce(self, announcement):
         await self.channel.send(announcement, delete_after=10)
@@ -291,12 +298,10 @@ class UnoButtonsBaseGame(discord.ui.View):
         this button to inform him of what card he draw.
         """
         player = self.manager.game.player_data[interaction.user]
-        card_drawn = self.manager.draw_cards(player)
-        await interaction.response.send_message("You drew a " + card_drawn, ephemeral = True,
-                                                delete_after = 10)
-        self.manager.next_turn()
-        # delete the response to the card button press (the UnoCardButtons UI message)
-        await interaction.delete_original_response()
+        card_drawn = await self.manager.draw_cards(player)
+        await interaction.response.send_message("You drew a " + color_to_emoji(card_drawn) + " " + card_drawn.value, ephemeral = True,
+                                                delete_after = 2)
+        await self.manager.next_turn()
 
 
 class UnoCardButtons(discord.ui.View):
@@ -332,8 +337,16 @@ class CardButton(discord.ui.Button):
         view: UnoCardButtons = self.view
         await self.manager.play_card(interaction, self.card)
         view.stop()
-        await interaction.response.send_message(f"You played {str(self.card)}", ephemeral = True,
-                                                delete_after = 10)
+        if (self.card.name != "Wild"):
+            await interaction.response.send_message(f"You played {color_to_emoji(self.card)} {self.card.value}", ephemeral = True,
+                                                delete_after = 2)
+        else:
+            print("asdfghjkl")
+            # Due to interactions only being able to be responded to once,
+            # I had to create this conditional statement to handle 
+            # wild cards, since we use the one-time interaction to send
+            # a menu to inquire a color choice. I don't know how to fix
+            # this issue at the moment. 
 
 
 class UnoWildCard(discord.ui.View):
@@ -347,6 +360,8 @@ class UnoWildCard(discord.ui.View):
         Chnages the wild card to red.
         """
         print(f"{interaction.user} pressed {button.label}!")
+        self.manager.game.top_card = Card("Red", "Card")
+        self.stop()
         
     @discord.ui.button(label = "Blue", style = discord.ButtonStyle.gray, emoji = "🔵")
     async def blue(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -354,6 +369,8 @@ class UnoWildCard(discord.ui.View):
         Chnages the wild card to blue.
         """
         print(f"{interaction.user} pressed {button.label}!")
+        self.manager.game.top_card = Card("Blue", "Card")
+        self.stop()
         
     @discord.ui.button(label = "Yellow", style = discord.ButtonStyle.gray, emoji = "🟡")
     async def yellow(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -361,6 +378,8 @@ class UnoWildCard(discord.ui.View):
         Chnages the wild card to yellow.
         """
         print(f"{interaction.user} pressed {button.label}!")
+        self.manager.game.top_card = Card("Yellow", "Card")
+        self.stop()
         
     @discord.ui.button(label = "Green", style = discord.ButtonStyle.gray, emoji = "🟢")
     async def green(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -368,6 +387,8 @@ class UnoWildCard(discord.ui.View):
         Chnages the wild card to green.
         """
         print(f"{interaction.user} pressed {button.label}!")
+        self.manager.game.top_card = Card("Green", "Card")
+        self.stop()
 
 
 class UnoCard(Card):
@@ -434,7 +455,7 @@ def card_to_emoji(card):
     elif card.name == "Blue":
         output += ":blue_circle: "
     elif card.name == "Wild":
-        output += ":black_circle: "
+        output += ":rainbow: "
     output += card.value
     return output
 
@@ -449,7 +470,7 @@ def color_to_emoji(card):
     elif card.name == "Blue":
         return "🔵"
     elif card.name == "Wild":
-        return "⚫"
+        return "🌈"
     return "🟣"
 
 
