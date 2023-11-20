@@ -470,7 +470,7 @@ class QuitGameButton(discord.ui.View):
         super().__init__()
         self.manager = manager
 
-    @discord.ui.button(label = "Go again!", style = discord.ButtonStyle.green)
+    @discord.ui.button(label = "Go Again!", style = discord.ButtonStyle.green)
     async def restart(self, interaction: discord.Interaction, button: discord.ui.Button):
         """
         Start a new round
@@ -482,7 +482,7 @@ class QuitGameButton(discord.ui.View):
         self.stop()
         await self.manager.start_new_round(interaction)
 
-    @discord.ui.button(label = "End game", style = discord.ButtonStyle.red)
+    @discord.ui.button(label = "End Game", style = discord.ButtonStyle.red)
     async def quit(self, interaction: discord.Interaction, button: discord.ui.Button):
         """
         Quit the game
