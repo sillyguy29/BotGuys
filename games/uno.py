@@ -23,8 +23,6 @@ class UnoPlayer(BasePlayer):
         playable_cards = [card for card in self.hand if card.name == top_card.name or card.value == top_card.value or card.name == "Wild"]
         return playable_cards
         
-    
-
 
 class UnoGame(BaseGame):
     """
@@ -84,6 +82,19 @@ class UnoManager(GameManager):
             return output
         return "Game has started!"
        
+    async def start_new_round(self, interaction):
+        """
+        Reset the game state to player join phase
+        """
+        for player in self.game.turn_order:
+            self.game.player_data[player].reset()
+        self.reset_deck()
+        self.game.turn_index = 0
+        self.game.game_state = 1
+        # allow players to join
+        self.base_gui = UnoButtonsBase(self)
+        await self.resend(interaction)
+    
     async def setup(self):
         print("Entering setup...")
         # Each player gets 7 cards to start
@@ -110,11 +121,22 @@ class UnoManager(GameManager):
         for i in range(num_cards):
             if len(self.game.deck) == 0: 
                 await self.announce("The deck is empty! Shuffling in the discard pile...")
-                self.regenerateDeck()
+                self.regenerate_deck()
             card = self.game.deck.pop()
             player.hand.append(card)
             player.hand = sorted(player.hand)
         if num_cards == 1: return card
+    
+    def reset_deck(self):
+        self.game.discard.clear()
+        self.game.deck.clear()
+        self.game.deck = generate_deck_uno()
+        random.shuffle(self.game.deck)
+    
+    def regenerate_deck(self):
+        random.shuffle(self.game.discard)
+        self.game.deck += self.game.discard 
+        self.game.discard.clear()
     
     def get_player_hand(self, player):
         return self.game.player_data[player].hand
@@ -155,6 +177,7 @@ class UnoManager(GameManager):
             view = UnoWildCard(self) # Menu to inquire what the next card is
             await interaction.response.send_message("Choose a color!", view = view, ephemeral=True, delete_after=10)
             await view.wait()
+            await interaction.delete_original_response()
         else: # Not wild, just replace
             self.game.top_card = card
         # If card is "Skip", "Draw Two", or "Draw Four", you will need a victim
@@ -188,7 +211,13 @@ class UnoManager(GameManager):
             await self.announce("Oh fuck! " + interaction.user.display_name + " has only one card left!")
         if len(player.hand) == 0:
             await self.announce(interaction.user.display_name + " won! Game game, nerds.")
-            self.quit_game(interaction) 
+            #self.quit_game(interaction)
+            # then initiate the endgame phase
+            self.game.game_state = 7
+            restart_ui = QuitGameButton(self)
+            active_msg = await self.channel.send("Play again?", view=restart_ui)
+            await restart_ui.wait()
+            await active_msg.edit(view=None)
         # Go to next turn
         await self.next_turn()
 
@@ -209,9 +238,6 @@ class UnoManager(GameManager):
 
     async def announce(self, announcement):
         await self.channel.send(announcement, delete_after=10)
-
-
-
 
 
          #######################################################
@@ -337,16 +363,6 @@ class CardButton(discord.ui.Button):
         view: UnoCardButtons = self.view
         await self.manager.play_card(interaction, self.card)
         view.stop()
-        if (self.card.name != "Wild"):
-            await interaction.response.send_message(f"You played {color_to_emoji(self.card)} {self.card.value}", ephemeral = True,
-                                                delete_after = 2)
-        else:
-            print("asdfghjkl")
-            # Due to interactions only being able to be responded to once,
-            # I had to create this conditional statement to handle 
-            # wild cards, since we use the one-time interaction to send
-            # a menu to inquire a color choice. I don't know how to fix
-            # this issue at the moment. 
 
 
 class UnoWildCard(discord.ui.View):
@@ -389,6 +405,40 @@ class UnoWildCard(discord.ui.View):
         print(f"{interaction.user} pressed {button.label}!")
         self.manager.game.top_card = Card("Green", "Card")
         self.stop()
+
+
+class QuitGameButton(discord.ui.View):
+    """
+    Button set that asks players if they want to play the game again
+    """
+    def __init__(self, manager):
+        super().__init__()
+        self.manager = manager
+
+    @discord.ui.button(label = "Go Again!", style = discord.ButtonStyle.green)
+    async def restart(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        Start a new round
+        """
+        # print when someone presses the button because otherwise
+        # pylint won't shut up about button being unused
+        print(f"{interaction.user} pressed {button.label}!")
+        # stop accepting input
+        self.stop()
+        await self.manager.start_new_round(interaction)
+
+    @discord.ui.button(label = "End Game", style = discord.ButtonStyle.red)
+    async def quit(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        Quit the game
+        """
+        # print when someone presses the button because otherwise
+        # pylint won't shut up about button being unused
+        print(f"{interaction.user} pressed {button.label}!")
+        # stop eccepting input
+        self.stop()
+        await interaction.channel.send(f"{interaction.user.mention} ended the game!")
+        await self.manager.quit_game(interaction)
 
 
 class UnoCard(Card):
@@ -472,5 +522,3 @@ def color_to_emoji(card):
     elif card.name == "Wild":
         return "🌈"
     return "🟣"
-
-
