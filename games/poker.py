@@ -27,17 +27,47 @@ class PokerPlayer(BasePlayer):
         self.is_cpu = is_cpu
         self.active = True #Inactive when they fold
 
+    def get_debug_str(self):
+        return (f"\t\thand: {self.hand}\n"
+                f"\t\tchips: {self.chips}\n"
+                f"\t\tround_bet: {self.round_bet}\n"
+                f"\t\ttotal_bet: {self.total_bet}\n"
+                f"\t\tactive: {self.active}\n")
+
 class PokerGame(BaseGame):
     """
-    Poker game model class. Keeps track of the deck and none else
+    Poker game model class. Keeps track of the deck and bets
     """
-    def __init__(self):
+    def __init__(self, cpus):
         # game state 1 -> accepting players but not playing yet
-        super().__init__(game_type=1, player_data={}, game_state=1)
+        super().__init__(game_type=1, player_data={}, game_state=1, cpus=cpus)
         
         self.deck = generate_deck()
-        self.dealer_hand = []
+        self.community_cards = []
+        self.pool = 0
+        self.largest_bet = 0
+        self.turn_order = []
+        self.turn_index = 0
+        self.best_hand = []
         random.shuffle(self.deck)
+    
+
+    def get_debug_str(self):
+        ret = super().get_debug_str()
+        ret += ("Poker game attributes:\n"
+                f"\tcommunity: {self.community_cards}\n"
+                f"\tpool: {self.pool}\n"
+                f"\tlargest_bet: {self.largest_bet}\n"
+                f"\tturn_order: {self.turn_order}\n")
+        ret += self.get_player_debug_strs()
+        return ret
+
+    def get_player_debug_strs(self):
+        ret = "Player data:\n"
+        for player in self.player_data:
+            ret += f"\tPlayer {player.display_name}:\n"
+            ret += self.player_data[player].get_debug_str()
+        return ret    
 
     #def __repr__(self):
  
@@ -70,16 +100,7 @@ class PokerManager(GameManager):
         self.game.game_state = 4
         # swap default GUI to betting phase buttons
         await interaction.channel.send(f"{interaction.user.display_name} started the game!")
-        await self.deal_cards()
-
-    async def start_new_round(self, interaction):
-        for player in self.game.turn_order:
-            self.game.player_data[player].reset()
-        self.game.dealer_hand.clear()
-        self.game.dealer_hidden_card = None
-        self.game.player_turn = -1
-        self.game.game_state = 1
-        self.base_gui = BlackjackButtonsBase(self)
+        await self.deal_cards(interaction)
         await self.resend(interaction)
 
     async def deal_cards(self, interaction):
@@ -96,39 +117,80 @@ class PokerManager(GameManager):
             self.game.player_data[i].hand.extend(STANDARD_52_DECK.draw(2))
 
         self.base_gui = ButtonsBetPhase(self, self.game.players)
+
+    async def make_bet(self, interaction, bet_amount):
+        """
+        Set a player's bet
+        """
+        # checks to see if the game is over
+        if await self.game_end_check(interaction):
+            return
+        
+        # check to see if it is the user's turn
+        user = interaction.user
+        if self.game.turn_order[self.game.turn_index] != user:
+            await send_info_message("This is not your turn yet.", interaction)
+            return 
+
+        # check to see if the user can bet, and deny them if not
+        user_data = self.game.player_data[user]
+        if int(bet_amount) > user_data.chips:
+            await send_info_message("You cannot afford this bet.", interaction)
+            return
+
+        # double check to make sure the user wants to confirm this bet
+        (yes_clicked, interaction) = await double_check(interaction=interaction,
+                                                    message_content=f"Betting {str(bet_amount)}.")
+        if not yes_clicked:
+            await send_info_message("Cancelled bet!", interaction)
+            return
+        # perform the bet
+        user_data.round_bet = int(bet_amount)
+        user_data.total_bet += int(bet_amount)
+        self.game.pool += int(bet_amount)
+        user_data.chips -= int(bet_amount)
+        if int(bet_amount) >= self.game.largest_bet:
+            self.game.largest_bet = int(bet_amount)
+        await interaction.channel.send((f"{user.mention} has bet {str(bet_amount)} "
+                                        f"chips and now has {str(user_data.chips)} "
+                                        "chips left!"))
+        await self.base_gui.next_player(interaction)
+        return
+    
+    async def deal_table(self, interaction):
+        if len(self.game.community_cards) == 0:
+           self.game.community_cards.extend(STANDARD_52_DECK.draw(3))
+
+        elif len(self.game.community_cards) == 5:
+            await self.finalize_game(interaction)
+        else:
+            self.game.community_cards.extend(STANDARD_52_DECK.draw(1))
         await self.resend(interaction)
+        return
+    
+    async def finalize_game(self, interaction):
+        self.game.game_state = 7
+        self.base_gui = None
 
-    async def start_next_player_turn(self):
-        self.game.player_turn += 1
-        if self.game.player_turn == self.game.players:
-            await self.channel.send("All players have had their turn, starting dealer draw!")
-            self.game.game_state = 6
-            await self.dealer_draw()
-            return
+        winning_hand = []
+        winner = {}
+        for player in self.game.player_data:
+            if not winning_hand:
+                winning_hand = self.game.player_data[player].hand
+                winner = player.display_name
+                self.game.best_hand = winning_hand
+            else:
+                if compare_hands(winning_hand, player.hand):
+                    winning_hand = self.game.player_data[player].hand
+                    winner = player.display_name
+                    self.game.best_hand = winning_hand
 
-        active_player = self.game.get_active_player()
-        active_player_data = self.game.player_data[active_player]
-        active_player_hand = active_player_data.hand
-
-        (eleven_aces, value) = bj_add(active_player_hand)
-        if value == 21:
-            await self.channel.send(f"{active_player.mention} got blackjack! Moving on...")
-            active_player_data.current_payout_multiplier = 2.5
-            await self.start_next_player_turn()
-            return
-        active_player_data.hand_value = value
-        active_player_data.eleven_ace_count = eleven_aces
-
-        hit_me_view = HitOrStand(self, active_player)
-        active_msg = await self.channel.send((f"{active_player.mention}, your turn! Your hand is\n"
-                                        f"{cards_to_str_52_standard(active_player_hand)}\n"
-                                        "What would you like to do?"), view = hit_me_view)
-        await hit_me_view.wait()
-        await active_msg.edit(view=None)
+        await interaction.response.send_message(f"{winner} has WON!") 
+        return
 
     def get_base_menu_string(self):
         if self.game.game_state == 1:
-            return "Who's ready for a game of blackjack?"
+            return "Who's ready for a game of poker?"
 
         elif self.game.game_state == 4:
             ret = "Current bets and chips:\n"
@@ -138,23 +200,37 @@ class PokerManager(GameManager):
             return ret
 
         elif self.game.game_state == 5:
-            ret = f"Dealer hand: {cards_to_str_52_standard(self.game.dealer_hand)}"
-            # no hidden card means we added it to the dealer's hand
-            if self.game.dealer_hidden_card is not None:
-                ret += ", ??"
-            for player in self.game.turn_order:
-                player_data = self.game.player_data[player]
-                ret += f"\n{player.mention} {player_data.get_play_phase_str()}"
+            ret = "Largest bet:\n"
+            ret += f"{self.game.largest_bet}\n"
+            ret += "Pool:\n"
+            ret += f"{self.game.pool}\n"
+            return ret
+        
+        elif self.game.game_state == 6:
+            ret = "Community cards:\n"
+            ret += f"{cards_to_str_52_standard(self.game.community_cards)}\n"
+            ret += "Largest bet:\n"
+            ret += f"{self.game.largest_bet}\n"
+            ret += "Pool:\n"
+            ret += f"{self.game.pool}\n"
+            return ret
+        
+        elif self.game.game_state == 7:
+            ret = "Winning hand:\n"
+            ret += f"{cards_to_str_52_standard(self.game.best_hand)}\n"
             return ret
 
         return "You shouldn't be seeing this."
+    
+    def get_debug_str(self):
+        return super().get_debug_str() + self.game.get_debug_str()
 
      
 class PokerButtonsBase(discord.ui.View):
     def __init__(self, manager):
         super().__init__()
         self.manager = manager
-    
+
     @discord.ui.button(label = "Join", style = discord.ButtonStyle.green)
     async def join(self, interaction: discord.Interaction, button: discord.ui.Button):
         """
@@ -167,15 +243,10 @@ class PokerButtonsBase(discord.ui.View):
         # print when someone presses the button because otherwise
         # pylint won't shut up about button being unused
         print(f"{interaction.user} pressed {button.label}!")
-        # TODO: the second arg should contain a class or data structure that contains
-        # all the data needed for a player in this game
-        if self.manager.game.is_accepting_players():
-            indi_player_data = PokerPlayer()
-            await self.manager.add_player(interaction, indi_player_data)
-        else:
-            await interaction.response.send_message("This game is not currently accepting players.",
-                                                     ephemeral = True, delete_after = 10)
-    
+
+        indi_player_data = PokerPlayer()
+        await self.manager.add_player(interaction, indi_player_data)
+
     @discord.ui.button(label = "Quit", style = discord.ButtonStyle.red)
     async def quit(self, interaction: discord.Interaction, button: discord.ui.Button):
         """
@@ -185,12 +256,9 @@ class PokerButtonsBase(discord.ui.View):
         # pylint won't shut up about button being unused
         print(f"{interaction.user} pressed {button.label}!")
         # remove current players from active player list
-        self.manager.remove_player(interaction)
-        # if nobody else is left, then quit the game
-        if self.game.players == 0:
-            await self.manager.quit_game(interaction)
+        await self.manager.remove_player(interaction)
 
-    @discord.ui.button(label = "Start game", style = discord.ButtonStyle.blurple)
+    @discord.ui.button(label = "Start Game", style = discord.ButtonStyle.blurple)
     async def start(self, interaction: discord.Interaction, button: discord.ui.Button):
         """
         Start the game
@@ -217,29 +285,6 @@ class PokerButtonsBaseGame(discord.ui.View):
         print(f"{interaction.user} pressed {button.label}!")
         # resend
         await self.manager.resend(interaction)
-
-class ViewHand(discord.ui.View):
-    """
-    Button group that just shows "View Hand" button
-    View Hand should send ephemeral message of the user's hand
-    """
-    def __init__(self, manager):
-        super().__init__()
-        self.manager = manager
-
-    @discord.ui.button(label = "View Hand", style = discord.ButtonStyle.green)
-    async def hit_me(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """
-        Let the user view their hand
-        """
-        print(f"{interaction.user} pressed {button.label}!")
-        # stop accepting interactions for this message
-        self.stop()
-        # send the user their hand
-        current_player = self.manager.game.player_data[interaction.user]
-        if len(current_player.hand) != 2:
-            raise ValueError("Player hand must contain 2 cards")
-        await interaction.response.send_message(f"Your hand is {str(current_player.hand[0])} and {str(current_player.hand[1])}", ephemeral = True, delete_after = 60)
 
 class BetModal(discord.ui.Modal):
     def __init__(self, manager):
@@ -270,15 +315,57 @@ class ButtonsBetPhase(discord.ui.View):
     def __init__(self, manager, player_count):
         super().__init__()
         self.manager = manager
-        self.player_count = player_count
+        self.total_player_count = player_count
+        self.active_player_count = player_count
         self.players_with_bets = 0
+    
+    async def next_player(self, interaction: discord.Interaction):
+        """
+        Add a player to the bet count, once all players have bet,
+        the manager moves to the dealing phase
+        """
+        self.manager.game.turn_index += 1
+        if self.manager.game.turn_index == self.active_player_count:
+            self.manager.game.turn_index = 0
+            if self.active_player_count == 0:
+                self.manager.finalize_game()
+            else:
+                bet_set = True 
+                for player in self.manager.game.player_data:
+                    if self.manager.game.player_data[player].active \
+                    and self.manager.game.player_data[player].round_bet != self.manager.game.largest_bet:
+                        bet_set = False
+                if bet_set:
+                    if self.manager.game.game_state == 5:
+                        self.manager.game.game_state = 6
+                    await self.manager.deal_table(interaction)
+                next_user = self.manager.game.turn_order[self.manager.game.turn_index]
+                if (self.manager.game.player_data[next_user].active) == False:
+                    self.next_player()
+    
+            
+    
+    @discord.ui.button(label = "View Hand", style = discord.ButtonStyle.blurple)
+    async def hit_me(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        Let the user view their hand
+        """
+        print(f"{interaction.user} pressed {button.label}!")
+        # send the user their hand
+        current_player = self.manager.game.player_data[interaction.user]
+        if len(current_player.hand) != 2:
+            raise ValueError("Player hand must contain 2 cards")
+        await interaction.response.send_message(f"Your hand is {cards_to_str_52_standard(current_player.hand)}", ephemeral = True, delete_after = 60)
+    
+    @discord.ui.button(label = "Call", style = discord.ButtonStyle.green)
+    async def call(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        Call
+        """
+        print(f"{interaction.user} pressed {button.label}!")
+        await self.manager.make_bet(interaction, self.manager.game.largest_bet)
 
-    async def add_betted_player(self):
-        self.players_with_bets += 1
-        if self.players_with_bets == self.player_count:
-            await self.manager.deal_cards()
-
-    @discord.ui.button(label = "Bet!", style = discord.ButtonStyle.green)
+    @discord.ui.button(label = "Raise", style = discord.ButtonStyle.red)
     async def bet(self, interaction: discord.Interaction, button: discord.ui.Button):
         """
         Allows the user to bring up the betting menu
@@ -288,44 +375,17 @@ class ButtonsBetPhase(discord.ui.View):
             return
         await interaction.response.send_modal(BetModal(self.manager))
 
-class StandardTurnButtons(discord.ui.View):
-    """
-    Button group for the options to Call, Raise, or Fold
-    """
-    def __init__(self, manager):
-        super().__init__()
-        self.manager = manager
-
-    @discord.ui.button(label = "Call", style = discord.ButtonStyle.gray)
-    async def call(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """
-        Call
-        """
-        print(f"{interaction.user} pressed {button.label}!")
-        # stop accepting interactions for this message
-        self.stop()
-        # User bets the amount needed to match the current bet
-        #TODO: What if the user doesn't have enough chips to call?
-
-    @discord.ui.button(label = "Raise", style = discord.ButtonStyle.green)
-    async def raise_bet(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """
-        Raise
-        """
-        print(f"{interaction.user} pressed {button.label}!")
-        # stop accepting interactions for this message
-        self.stop()
-        #TODO: Ask the user to make a bet
-
-    @discord.ui.button(label = "Fold", style = discord.ButtonStyle.red)
+    @discord.ui.button(label = "Fold", style = discord.ButtonStyle.gray)
     async def fold(self, interaction: discord.Interaction, button: discord.ui.Button):
         """
         Fold
         """
         print(f"{interaction.user} pressed {button.label}!")
-        # stop accepting interactions for this message
-        self.stop()
-        #TODO: Fold stuff
+        #Fold
+        self.active_player_count -= 1
+        self.manager.game.player_data[interaction.user].active = False
+        self.manager.base_gui = None
+        await interaction.response.send_message(f"{interaction.user.mention} has folded!")
 
 
 
