@@ -82,6 +82,19 @@ class UnoManager(GameManager):
             return output
         return "Game has started!"
        
+    async def start_new_round(self, interaction):
+        """
+        Reset the game state to player join phase
+        """
+        for player in self.game.turn_order:
+            self.game.player_data[player].reset()
+        self.reset_deck()
+        self.game.turn_index = 0
+        self.game.game_state = 1
+        # allow players to join
+        self.base_gui = UnoButtonsBase(self)
+        await self.resend(interaction)
+    
     async def setup(self):
         print("Entering setup...")
         # Each player gets 7 cards to start
@@ -113,6 +126,12 @@ class UnoManager(GameManager):
             player.hand.append(card)
             player.hand = sorted(player.hand)
         if num_cards == 1: return card
+    
+    def reset_deck(self):
+        self.game.discard.clear()
+        self.game.deck.clear()
+        self.game.deck = generate_deck_uno()
+        random.shuffle(self.game.deck)
     
     def regenerate_deck(self):
         random.shuffle(self.game.discard)
@@ -192,7 +211,13 @@ class UnoManager(GameManager):
             await self.announce("Oh fuck! " + interaction.user.display_name + " has only one card left!")
         if len(player.hand) == 0:
             await self.announce(interaction.user.display_name + " won! Game game, nerds.")
-            self.quit_game(interaction) 
+            #self.quit_game(interaction)
+            # then initiate the endgame phase
+            self.game.game_state = 7
+            restart_ui = QuitGameButton(self)
+            active_msg = await self.channel.send("Play again?", view=restart_ui)
+            await restart_ui.wait()
+            await active_msg.edit(view=None)
         # Go to next turn
         await self.next_turn()
 
@@ -380,6 +405,40 @@ class UnoWildCard(discord.ui.View):
         print(f"{interaction.user} pressed {button.label}!")
         self.manager.game.top_card = Card("Green", "Card")
         self.stop()
+
+
+class QuitGameButton(discord.ui.View):
+    """
+    Button set that asks players if they want to play the game again
+    """
+    def __init__(self, manager):
+        super().__init__()
+        self.manager = manager
+
+    @discord.ui.button(label = "Go Again!", style = discord.ButtonStyle.green)
+    async def restart(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        Start a new round
+        """
+        # print when someone presses the button because otherwise
+        # pylint won't shut up about button being unused
+        print(f"{interaction.user} pressed {button.label}!")
+        # stop accepting input
+        self.stop()
+        await self.manager.start_new_round(interaction)
+
+    @discord.ui.button(label = "End Game", style = discord.ButtonStyle.red)
+    async def quit(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        Quit the game
+        """
+        # print when someone presses the button because otherwise
+        # pylint won't shut up about button being unused
+        print(f"{interaction.user} pressed {button.label}!")
+        # stop eccepting input
+        self.stop()
+        await interaction.channel.send(f"{interaction.user.mention} ended the game!")
+        await self.manager.quit_game(interaction)
 
 
 class UnoCard(Card):
