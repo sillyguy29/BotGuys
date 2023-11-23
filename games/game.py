@@ -115,6 +115,7 @@ class GameManager():
         Send the base menu for the first time. The interaction passed in should be
         the slash command that started the game
         """
+        self.quick_log("Creating game")
         # construct the first base menu message, grabbing the buttons from self.base_gui
         # and the message contents from self.get_base_menu_string
         await interaction.response.send_message(content=self.get_base_menu_string(),
@@ -127,17 +128,20 @@ class GameManager():
         """
         Edit the active base menu to reflect the current game state
         """
+        self.quick_log("Refreshing base menu")
         # check to make sure the game hasn't ended, do nothing if it has
         if await self.game_end_check(interaction):
             return
 
         await self.current_active_menu.edit(content=self.get_base_menu_string(),
                                             view=self.base_gui)
+        self.quick_log("Base menu refreshed")
 
     async def resend(self, interaction):
         """
         Remove the buttons from the current active base menu and send a new one
         """
+        self.quick_log("Resending base menu")
         # check to make sure the game hasn't ended, do nothing if it has
         if await self.game_end_check(interaction):
             return
@@ -148,6 +152,7 @@ class GameManager():
         # send a new base menu into
         self.current_active_menu = await self.channel.send(self.get_base_menu_string(),
                                                            view=self.base_gui, silent=True)
+        self.quick_log("Base menu resent")
 
     async def quit_game(self, interaction):
         """
@@ -159,6 +164,7 @@ class GameManager():
         if await self.game_end_check(interaction):
             return
 
+        self.quick_log("Initiating game end process")
         self.game.game_state = -1
         await self.current_active_menu.edit(view=None)
         await self.factory.stop_game(self.channel.id)
@@ -212,48 +218,58 @@ class GameManager():
         Check whether a player can be added to the game in its current state, and if so,
         add them and associate them with init_player_data.
         """
+        self.quick_log("Attempting to join game", interaction)
         # see if game has already ended, return if it has
         if await self.game_end_check(interaction):
             return
 
         if self.game.game_state == 0:
-            await interaction.response.send_message("This game is open to any player at any time.",
-                                                     ephemeral = True, delete_after = 10)
+            self.quick_log("Couldn't join game (open game)", interaction)
+            await send_info_message("This game is open to any player at any time.", interaction)
+
         elif self.game.game_state in (1, 2):
             if self.user_in_game(interaction.user):
-                await interaction.response.send_message("You are already in this game.",
-                                                        ephemeral = True, delete_after = 10)
+                self.quick_log("Couldn't join game (already joined)", interaction)
+                await send_info_message("You are already in this game.", interaction)
             else:
                 self.game.players += 1
                 self.game.player_data[interaction.user] = init_player_data
                 await interaction.response.send_message((f"{interaction.user.mention} "
                                                          "joined the game!"))
+                self.quick_log("Joined game successfully", interaction)
+
         else:
-            await interaction.response.send_message("This game is not currently accepting players.",
-                                                     ephemeral = True, delete_after = 10)
+            self.quick_log("Couldn't join game (bad gs)", interaction)
+            await send_info_message("This game is not currently accepting players.", interaction)
 
     async def remove_player(self, interaction):
         """
         Check whether a player can leave the game in its current state, and if so, remove
         """
+        self.quick_log("Attempting to leave game", interaction)
+
         # see if game has already ended, return if it has
         if await self.game_end_check(interaction):
             return
 
         if self.game.game_state == 0:
-            await interaction.response.send_message("This game is open to any player at any time.",
-                                                     ephemeral = True, delete_after = 10)
+            self.quick_log("Couldn't leave game (open game)", interaction)
+            await send_info_message("This game is open to any player at any time.", interaction)
+
         elif not self.user_in_game(interaction.user):
-            await interaction.response.send_message("You are not in this game.",
-                                                     ephemeral = True, delete_after = 10)
+            self.quick_log("Couldn't leave game (not in game)", interaction)
+            await send_info_message("You are not in this game.", interaction)
+
         elif self.game.game_state in (1, 3):
             self.game.players -= 1
             self.game.player_data.pop(interaction.user)
             await interaction.response.send_message((f"{interaction.user.mention} "
                                                     "left the game!"))
+            self.quick_log("Left game successfully", interaction)
+
         else:
-            await interaction.response.send_message("You cannot leave this game right now.",
-                                                     ephemeral = True, delete_after = 10)
+            self.quick_log("Couldn't leave game (bad gs)", interaction)
+            await send_info_message("You cannot leave this game right now.", interaction)
 
     async def game_end_check(self, interaction):
         """
@@ -263,9 +279,7 @@ class GameManager():
         """
         # if the game has ended, notify the user and don't do anything
         if self.game.has_ended():
-            await interaction.response.send_message("This game has ended.",
-                                                    ephemeral = True,
-                                                    delete_after = 10)
+            await send_info_message("This game has ended.", interaction)
             # True -> game has ended
             return True
         # False -> game has not ended
@@ -287,24 +301,31 @@ class GameManager():
         game.
         - game_end: defaults to True. Checks if the game has ended.
         """
+        self.quick_log("Checking interaction validity", interaction)
+
         if interaction is None:
+            self.quick_log("Interaction validity check failed (interaction=None)")
             return False
 
         if game_end:
             if self.game.game_state == -1:
+                self.quick_log("Interaction validity check failed (game_end)", interaction)
                 await send_info_message("This game has ended.", interaction)
                 return False
 
         if in_game:
             if not self.user_in_game(interaction.user):
+                self.quick_log("Interaction validity check failed (in_game)", interaction)
                 await send_info_message("You are not in this game.", interaction)
                 return False
 
         if turn_order:
             if self.get_active_player() != interaction.user:
+                self.quick_log("Interaction validity check failed (turn_order)", interaction)
                 await send_info_message("It's not your turn.", interaction)
                 return False
 
+        self.quick_log("Interaction validity check succeeded", interaction)
         return True
 
     def get_debug_str(self):
@@ -313,4 +334,20 @@ class GameManager():
         """
         return ("Base manager:\n"
                 f"\tbase_gui: {self.base_gui}\n"
-                f"\tchannel id: {self.channel.id}\n")
+                f"\tchannel id: {self.channel.id}\n" + self.game.get_debug_str())
+
+    def quick_log(self, content, interaction=None, level=logging.DEBUG):
+        """
+        Sends a log that has useful information already applied to it.
+        The default logging level is debug. Override with level arg.
+        Normally appends channel id, game type, and game state, but can
+        also append a username if an interaction is passed.
+        """
+        
+        log_content = f"[{self.channel.id}](gt,gs:{self.game.game_type},{self.game.game_state})"
+        if interaction is not None:
+            log_content += f"(user:{interaction.user}) " + content
+        else:
+            log_content += " " + content
+
+        logging.log(level, log_content)
