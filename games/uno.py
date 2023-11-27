@@ -18,13 +18,20 @@ class UnoPlayer(BasePlayer):
     class to include a few extra attributes: a list that represents
     the player's hand, a boolean to flag when the player has been 
     skipped, and a method to determine which cards in the player's 
-    hand are playable given the game state's top card.
+    hand are playable given the game state's top card. 
+    
+    active_interaction serves as a reference to the interaction of 
+    pressing the "Show Hand" button. We need to track it so that we
+    can delete the interaction message if the player presses "Draw"
+    instead of a playing a card. Otherwise, the "Show Hand" menu
+    will linger until it deletes itself. 
     """
     def __init__(self):
         super().__init__()
     
         self.hand = []
         self.skipped = False
+        self.active_interaction = None
         
     def get_playable_cards(self, top_card):
         playable_cards = [card for card in self.hand if card.name == top_card.name or card.value == top_card.value or card.name == "Wild"]
@@ -376,7 +383,7 @@ class UnoManager(GameManager):
             c. Player has 1 card remaining in hand.
             d. Player won.
         '''
-        await self.channel.send(announcement, delete_after=10)
+        await self.channel.send(announcement, delete_after=3)
 
     def generate_deck(self):
         '''
@@ -518,15 +525,26 @@ class UnoButtonsBaseGame(discord.ui.View):
         has passed (prevents menus that are not accounted for after
         game end).
         """
-        print(f"{interaction.user} pressed {button.label}!")
         
+        # Delete prior "Show Hand" menu so there isn't several lingering
+        if (self.manager.game.player_data[interaction.user].active_interaction):
+            await self.manager.game.player_data[interaction.user].active_interaction.delete_original_response()
+            self.manager.game.player_data[interaction.user].active_interaction = None
+
+        # Send user a new "Show Hand" menu
+        print(f"{interaction.user} pressed {button.label}!")
         view = UnoCardButtons(self.manager, interaction.user)
         await interaction.response.send_message("Your cards:", view = view, ephemeral = True,
                                                 delete_after = 20)
+        
+        # We track this interaction so we can delete the message if player presses "Draw"
+        #    rather than waiting for the message to delete itself after 20 seconds
+        self.manager.game.player_data[interaction.user].active_interaction = interaction
         # wait for the view to call self.stop() before we move beyond this point
         await view.wait()
         # delete the response to the card button press (the UnoCardButtons UI message)
         await interaction.delete_original_response()
+        self.manager.game.player_data[interaction.user].active_interaction = None
 
     @discord.ui.button(label = "Draw", style = discord.ButtonStyle.blurple)
     async def draw_card(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -534,11 +552,24 @@ class UnoButtonsBaseGame(discord.ui.View):
         Sends a ephemeral message to the person who interacted with
         this button to inform him of what card he draw.
         """
+        # Reject request to draw cards if button presser is not the current turn player
+        current_turn_player = self.manager.game.turn_order[self.manager.game.turn_index]
+        if interaction.user != current_turn_player:
+            await interaction.response.send_mesage("Wait your turn.", ephemeral = True, delete_after = 2)
+            return
+
+        # If there is an active "Show Hand" menu, we should delete it now
+        if (self.manager.game.player_data[interaction.user].active_interaction):
+            await self.manager.game.player_data[interaction.user].active_interaction.delete_original_response()
+            self.manager.game.player_data[interaction.user].active_interaction = None
+            
+        # If the button presser IS the turn player, do the following:
         player = self.manager.game.player_data[interaction.user]
         card_drawn = await self.manager.draw_cards(player)
         await interaction.response.send_message("You drew a " + self.manager.color_to_emoji(card_drawn) + " " + card_drawn.value, ephemeral = True,
                                                 delete_after = 2)
         await self.manager.next_turn()
+
 
 
 class UnoCardButtons(discord.ui.View):
