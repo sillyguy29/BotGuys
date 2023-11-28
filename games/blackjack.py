@@ -83,9 +83,9 @@ class BlackjackGame(BaseGame):
     """
     Blackjack game model class. Keeps track of the turn order and dealer's hand
     """
-    def __init__(self, cpus):
+    def __init__(self):
         # game state 1 -> accepting players but not playing yet
-        super().__init__(game_type=1, player_data={}, game_state=1, cpus=cpus)
+        super().__init__(game_type=1, player_data={}, game_state=1)
 
         self.turn_order = []
         self.dealer_hand = []
@@ -124,8 +124,8 @@ class BlackjackManager(GameManager):
     """
     Blackjack manager class
     """
-    def __init__(self, factory, channel, cpus):
-        super().__init__(game=BlackjackGame(cpus), base_gui=BlackjackButtonsBase(self),
+    def __init__(self, factory, channel):
+        super().__init__(game=BlackjackGame(), base_gui=BlackjackButtonsBase(self),
                          channel=channel, factory=factory)
 
     async def add_player(self, interaction, init_player_data=None):
@@ -147,7 +147,9 @@ class BlackjackManager(GameManager):
         """
         Start the game
         """
+        self.quick_log("Starting game", interaction)
         if self.game.game_state != 1:
+            self.quick_log("Game didn't start (already started)")
             await send_info_message("This game has already started", interaction)
             return
         # game_state == 4 -> players cannot join or leave
@@ -457,9 +459,6 @@ class BlackjackManager(GameManager):
         active_msg = await self.channel.send("Play again?", view=restart_ui)
         await restart_ui.wait()
         await active_msg.edit(view=None)
-
-    def get_debug_str(self):
-        return super().get_debug_str() + self.game.get_debug_str()
 
 
 class QuitGameButton(discord.ui.View):

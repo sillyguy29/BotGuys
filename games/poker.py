@@ -414,17 +414,17 @@ def max_hand(hand):
     alt_lookup = ("A",) + lookup[:12] #Used in checking Straight Flush and Straights for A=1
     if len(hand) != 5:
         raise ValueError("Hand must contain 5 cards")
-    hand.sort(key = lambda x: lookup.index(x.face))
+    hand.sort(key = lambda x: lookup.index(x.value))
     same_suit = True
     for c in hand:
-        if c.suit != hand[0].suit:
+        if c.name != hand[0].name:
             same_suit = False
             break
-    highest_value = lookup.index(hand[4].face)
+    highest_value = lookup.index(hand[4].value)
 
     #Check Royal Flush
     if same_suit:
-        if hand[0].face == "10" and hand[1].face == "J" and hand[2].face == "Q" and hand[3].face == "K" and hand[4].face == "A":
+        if hand[0].value == "10" and hand[1].value == "J" and hand[2].value == "Q" and hand[3].value == "K" and hand[4].value == "A":
             return encode_hand_value((10, highest_value))
     
     #Check Straight Flush
@@ -432,7 +432,7 @@ def max_hand(hand):
         #Straight Flush uses alt_lookup because if it is not a Royal Flush, A=1 if it is a Flush
         is_straight = True
         for index in range(4):
-            if alt_lookup.index(hand[index].face) + 1 != alt_lookup.index(hand[index + 1].face):
+            if alt_lookup.index(hand[index].value) + 1 != alt_lookup.index(hand[index + 1].value):
                 is_straight = False
                 break
         if is_straight:
@@ -441,7 +441,7 @@ def max_hand(hand):
     num_same = 0
     type_dict = dict()
     for c in hand:
-        type_dict[c.face] = type_dict.get(c.face, 0) + 1
+        type_dict[c.value] = type_dict.get(c.value, 0) + 1
 
     #Check Four of a Kind
     for key in type_dict:
@@ -459,17 +459,17 @@ def max_hand(hand):
                 
     #Check Flush
     if same_suit:
-        return encode_hand_value((6, ) + tuple(sorted([lookup.index(c.face) for c in hand], reverse = True)))
+        return encode_hand_value((6, ) + tuple(sorted([lookup.index(c.value) for c in hand], reverse = True)))
     
     #Check Straight
     is_high_straight = True
     for index in range(4):
-        if lookup.index(hand[index].face) + 1 != lookup.index(hand[index + 1].face):
+        if lookup.index(hand[index].value) + 1 != lookup.index(hand[index + 1].value):
             is_high_straight = False
             break
     is_low_straight = True
     for index in range(4):
-        if alt_lookup.index(hand[index].face) + 1 != alt_lookup.index(hand[index + 1].face):
+        if alt_lookup.index(hand[index].value) + 1 != alt_lookup.index(hand[index + 1].value):
             is_low_straight = False
             break
     if is_high_straight:
@@ -515,7 +515,7 @@ def max_hand(hand):
         return encode_hand_value((2, pair_value) + tuple(sorted(kicker_values, reverse = True)))
     
     #No good hand, must use high card
-    return encode_hand_value((1, ) + tuple(sorted([lookup.index(c.face) for c in hand], reverse = True)))
+    return encode_hand_value((1, ) + tuple(sorted([lookup.index(c.value) for c in hand], reverse = True)))
 
 def compare_hands(hand1, hand2):
     """
