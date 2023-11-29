@@ -154,9 +154,9 @@ class UnoManager(GameManager):
         """
         start_new_round: Reset the game state to player join phase.
         """
+        self.quick_log("Starting a new round of Uno...")
         for player in self.game.turn_order:
             self.game.player_data[player].reset()
-        self.game.turn_index = 0
         self.game.game_state = 1
         # allow players to join
         self.base_gui = UnoButtonsBase(self)
@@ -171,7 +171,7 @@ class UnoManager(GameManager):
         considered appropriate to start the game), choosing a random 
         player to start the game, and having each player draw 7 cards.
         '''
-        print("Entering setup...")
+        self.quick_log("Setting up the game of Uno...")
         # Create the deck
         self.game.discard.clear()
         self.game.deck = self.generate_deck()
@@ -205,6 +205,7 @@ class UnoManager(GameManager):
         argument is provided, this method adds that many cards to the 
         players hand. Otherwise, it defaults to adding only 1 card.
         '''
+        self.quick_log("A player is drawing cards...")
         for i in range(num_cards):
             if len(self.game.deck) == 0: 
                 await self.announce("The deck is empty! Shuffling in the discard pile...")
@@ -221,6 +222,7 @@ class UnoManager(GameManager):
         discard pile, adds all the cards in the discard pile to the
         deck, then empties the discard pile.
         '''
+        self.quick_log("Regenerating the deck...")
         random.shuffle(self.game.discard)
         self.game.deck += self.game.discard 
         self.game.discard.clear()
@@ -299,6 +301,7 @@ class UnoManager(GameManager):
         This method very much upholds the 'God Function' trope. Refactoring may
         be desired in this area.
         '''
+        self.quick_log("A player is playing a card...")
         # We put add the top card to the discard pile, 
         # but only if it's not a placeholder card        
         if (self.game.top_card.value != "Card"):
@@ -341,14 +344,8 @@ class UnoManager(GameManager):
         if len(player.hand) == 1:
             await self.announce("Oh fuck! " + interaction.user.display_name + " has only one card left!")
         if len(player.hand) == 0:
-            await self.announce(interaction.user.display_name + " won! Game game, nerds.")
-            #self.quit_game(interaction)
-            # then initiate the endgame phase
-            self.game.game_state = 7
-            restart_ui = QuitGameButton(self)
-            active_msg = await self.channel.send("Play again?", view=restart_ui)
-            await restart_ui.wait()
-            await active_msg.edit(view=None)
+            await self.end_game(interaction)
+            return
         # Go to next turn
         await self.next_turn()
 
@@ -360,6 +357,7 @@ class UnoManager(GameManager):
         this method refreshes the base GUI so the new player can take their
         turn.
         '''
+        self.quick_log("Going to the next turn...")
         # Increment (or decrement if turn order reversed) the turn index 
         self.update_turn_index()
     
@@ -456,6 +454,16 @@ class UnoManager(GameManager):
         elif card.name == "Wild":
             return "🌈"
         return "🟣"
+    
+    async def end_game(self, interaction):
+        await self.announce(interaction.user.display_name + " won! Game game, nerds.")
+        #self.quit_game(interaction)
+        # then initiate the endgame phase
+        self.game.game_state = 7
+        restart_ui = QuitGameButton(self)
+        active_msg = await self.channel.send("Play again?", view=restart_ui)
+        await restart_ui.wait()
+        await active_msg.edit(view=None)
 
 
          #######################################################
@@ -543,7 +551,7 @@ class UnoButtonsBaseGame(discord.ui.View):
         # wait for the view to call self.stop() before we move beyond this point
         await view.wait()
         # delete the response to the card button press (the UnoCardButtons UI message)
-        await interaction.delete_original_response()
+        if not interaction.is_expired(): await interaction.delete_original_response()
         self.manager.game.player_data[interaction.user].active_interaction = None
 
     @discord.ui.button(label = "Draw", style = discord.ButtonStyle.blurple)
