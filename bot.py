@@ -68,12 +68,9 @@ def create_commands(client):
         await client.game_factory.start_game(interaction, game_type=2, cpus=cpus)    
 
     @client.tree.command(name="uno", description="Play a game of Uno")
-    @discord.app_commands.describe(
-        cpus="Amount of cpu players (max of 3)"
-    )
-    async def play_uno(interaction: discord.Interaction, players: int, cpus: int):
+    async def play_uno(interaction: discord.Interaction):
         logging.info("Uno slash command used in channel [%i]", interaction.channel_id)
-        await client.game_factory.start_game(interaction, game_type=3, cpus=cpus)
+        await client.game_factory.start_game(interaction, game_type=3)
 
     @client.tree.command(name="getdebugdata", description="Get internal data for one or all games")
     @discord.app_commands.describe(
