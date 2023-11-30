@@ -16,6 +16,7 @@ from util import send_info_message
 from util import generate_deck
 import random
 from itertools import combinations
+import copy
 
 class PokerPlayer(BasePlayer):
     def __init__(self, is_cpu=False):
@@ -47,9 +48,10 @@ class PokerGame(BaseGame):
         self.pool = 0
         self.largest_bet = 0
         self.turn_order = []
-        self.active_player_turn_order = self.turn_order
+        self.active_player_turn_order = []
         self.turn_index = 0
         self.best_hand = []
+        self.winner = {}
         random.shuffle(self.deck)
     
 
@@ -101,9 +103,37 @@ class PokerManager(GameManager):
             return
         # game_state == 4 -> players cannot join or leave
         self.game.game_state = 4
+        for player in self.game.turn_order:
+            self.game.active_player_turn_order.append(player)
+        
         # swap default GUI to betting phase buttons
         await interaction.channel.send(f"{interaction.user.display_name} started the game!")
         await self.deal_cards(interaction)
+        await self.resend(interaction)
+    
+    async def start_new_round(self, interaction):
+        """
+        Reset the game state to player join phase
+        """
+        self.game.game_state = 1
+
+        for player in self.game.turn_order:
+            self.game.player_data[player].hand = []
+            self.game.player_data[player].round_bet = 0
+            self.game.player_data[player].total_bet = 0
+            self.game.player_data[player].active = True
+
+        self.game.deck = generate_deck()
+        self.game.community_cards = []
+        self.game.pool = 0
+        self.game.largest_bet = 0
+        self.game.active_player_turn_order = []
+        self.game.turn_index = 0
+        self.game.best_hand = []
+        self.game.winner = {}
+        random.shuffle(self.game.deck)
+        # allow players to join
+        self.base_gui = PokerButtonsBase(self)
         await self.resend(interaction)
 
     async def deal_cards(self, interaction):
@@ -148,19 +178,20 @@ class PokerManager(GameManager):
             await send_info_message("Cancelled bet!", interaction)
             return
         # perform the bet
-        user_data.round_bet = int(bet_amount)
+        user_data.round_bet += int(bet_amount)
         user_data.total_bet += int(bet_amount)
         self.game.pool += int(bet_amount)
         user_data.chips -= int(bet_amount)
-        if int(bet_amount) >= self.game.largest_bet:
-            self.game.largest_bet = int(bet_amount)
+        if user_data.round_bet >= self.game.largest_bet:
+            self.game.largest_bet = user_data.round_bet
         await interaction.channel.send((f"{user.mention} has bet {str(bet_amount)} "
                                         f"chips and now has {str(user_data.chips)} "
                                         "chips left!"))
-        await self.base_gui.next_player(interaction)
+        await self.base_gui.next_player(interaction, False)
         return
     
     async def deal_table(self, interaction):
+        self.game.largest_bet = 0
         if len(self.game.community_cards) == 0:
            self.game.community_cards.extend(STANDARD_52_DECK.draw(3))
 
@@ -175,20 +206,24 @@ class PokerManager(GameManager):
         self.game.game_state = 7
         self.base_gui = None
 
-        winning_hand = []
-        winner = {}
-        for player in self.game.player_data:
-            if not winning_hand:
-                winning_hand = self.game.player_data[player].hand
-                winner = player.display_name
-                self.game.best_hand = winning_hand
-            else:
-                if compare_hands(winning_hand, player.hand):
+        if len(self.game.active_player_turn_order) != 0:
+            winning_hand = []
+            for player in self.game.player_data:
+                if not winning_hand:
                     winning_hand = self.game.player_data[player].hand
-                    winner = player.display_name
+                    self.game.winner = player.display_name
                     self.game.best_hand = winning_hand
-
-        await interaction.response.send_message(f"{winner} has WON!") 
+                else:
+                    if best_hand(winning_hand, self.game.community_cards) > best_hand(self.game.player_data[player].hand, self.game.community_cards):
+                        winning_hand = self.game.player_data[player].hand
+                        self.game.winner = player.display_name
+                        self.game.best_hand = winning_hand
+            await self.resend(interaction)
+        
+        restart_ui = QuitGameButton(self)
+        active_msg = await self.channel.send("Play again?", view=restart_ui)
+        await restart_ui.wait()
+        await active_msg.edit(view=None)
         return
 
     def get_base_menu_string(self):
@@ -220,8 +255,11 @@ class PokerManager(GameManager):
             return ret
         
         elif self.game.game_state == 7:
-            ret = "Winning hand:\n"
+            ret = f"{self.game.winner} has WON!\n"
+            ret += "Winning hand:\n"
             ret += f"{cards_to_str_52_standard(self.game.best_hand)}\n"
+            if len(self.game.active_player_turn_order) <= 0:
+                ret = ""
             return ret
 
         return "You shouldn't be seeing this."
@@ -320,16 +358,17 @@ class ButtonsBetPhase(discord.ui.View):
         super().__init__()
         self.manager = manager
     
-    async def next_player(self, interaction: discord.Interaction):
+    async def next_player(self, interaction: discord.Interaction, folded):
         """
         Add a player to the bet count, once all players have bet,
         the manager moves to the dealing phase
         """
-        self.manager.game.turn_index += 1
+        if not folded:
+            self.manager.game.turn_index += 1
         if self.manager.game.turn_index >= len(self.manager.game.active_player_turn_order):
             self.manager.game.turn_index = 0
             if len(self.manager.game.active_player_turn_order) == 0:
-                self.manager.finalize_game()
+                await self.manager.finalize_game(interaction)
             else:
                 bet_set = True 
                 for player in self.manager.game.player_data:
@@ -339,6 +378,8 @@ class ButtonsBetPhase(discord.ui.View):
                 if bet_set:
                     if self.manager.game.game_state == 5:
                         self.manager.game.game_state = 6
+                    for player in self.manager.game.turn_order:
+                        self.manager.game.player_data[player].round_bet = 0
                     await self.manager.deal_table(interaction)
     
             
@@ -361,7 +402,7 @@ class ButtonsBetPhase(discord.ui.View):
         Call
         """
         print(f"{interaction.user} pressed {button.label}!")
-        await self.manager.make_bet(interaction, self.manager.game.largest_bet)
+        await self.manager.make_bet(interaction, self.manager.game.largest_bet - self.manager.game.player_data[interaction.user].round_bet)
 
     @discord.ui.button(label = "Raise", style = discord.ButtonStyle.red)
     async def bet(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -384,7 +425,41 @@ class ButtonsBetPhase(discord.ui.View):
         self.manager.game.active_player_turn_order.remove(interaction.user)
         self.manager.base_gui = None
         await interaction.response.send_message(f"{interaction.user.mention} has folded!")
-        await self.next_player(interaction)
+        await self.next_player(interaction, True)
+
+
+class QuitGameButton(discord.ui.View):
+    """
+    Button set that asks players if they want to play the game again
+    """
+    def __init__(self, manager):
+        super().__init__()
+        self.manager = manager
+
+    @discord.ui.button(label = "Go Again!", style = discord.ButtonStyle.green)
+    async def restart(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        Start a new round
+        """
+        # print when someone presses the button because otherwise
+        # pylint won't shut up about button being unused
+        print(f"{interaction.user} pressed {button.label}!")
+        # stop accepting input
+        self.stop()
+        await self.manager.start_new_round(interaction)
+
+    @discord.ui.button(label = "End Game", style = discord.ButtonStyle.red)
+    async def quit(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        Quit the game
+        """
+        # print when someone presses the button because otherwise
+        # pylint won't shut up about button being unused
+        print(f"{interaction.user} pressed {button.label}!")
+        # stop eccepting input
+        self.stop()
+        await interaction.channel.send(f"{interaction.user.mention} ended the game!")
+        await self.manager.quit_game(interaction)
 
 
 
@@ -413,17 +488,17 @@ def max_hand(hand):
     alt_lookup = ("A",) + lookup[:12] #Used in checking Straight Flush and Straights for A=1
     if len(hand) != 5:
         raise ValueError("Hand must contain 5 cards")
-    hand.sort(key = lambda x: lookup.index(x.face))
+    hand.sort(key = lambda x: lookup.index(x.value))
     same_suit = True
     for c in hand:
-        if c.suit != hand[0].suit:
+        if c.name != hand[0].name:
             same_suit = False
             break
-    highest_value = lookup.index(hand[4].face)
+    highest_value = lookup.index(hand[4].value)
 
     #Check Royal Flush
     if same_suit:
-        if hand[0].face == "10" and hand[1].face == "J" and hand[2].face == "Q" and hand[3].face == "K" and hand[4].face == "A":
+        if hand[0].value == "10" and hand[1].value == "J" and hand[2].value == "Q" and hand[3].value == "K" and hand[4].value == "A":
             return encode_hand_value((10, highest_value))
     
     #Check Straight Flush
@@ -431,7 +506,7 @@ def max_hand(hand):
         #Straight Flush uses alt_lookup because if it is not a Royal Flush, A=1 if it is a Flush
         is_straight = True
         for index in range(4):
-            if alt_lookup.index(hand[index].face) + 1 != alt_lookup.index(hand[index + 1].face):
+            if alt_lookup.index(hand[index].value) + 1 != alt_lookup.index(hand[index + 1].value):
                 is_straight = False
                 break
         if is_straight:
@@ -440,7 +515,7 @@ def max_hand(hand):
     num_same = 0
     type_dict = dict()
     for c in hand:
-        type_dict[c.face] = type_dict.get(c.face, 0) + 1
+        type_dict[c.value] = type_dict.get(c.value, 0) + 1
 
     #Check Four of a Kind
     for key in type_dict:
@@ -458,17 +533,17 @@ def max_hand(hand):
                 
     #Check Flush
     if same_suit:
-        return encode_hand_value((6, ) + tuple(sorted([lookup.index(c.face) for c in hand], reverse = True)))
+        return encode_hand_value((6, ) + tuple(sorted([lookup.index(c.value) for c in hand], reverse = True)))
     
     #Check Straight
     is_high_straight = True
     for index in range(4):
-        if lookup.index(hand[index].face) + 1 != lookup.index(hand[index + 1].face):
+        if lookup.index(hand[index].value) + 1 != lookup.index(hand[index + 1].value):
             is_high_straight = False
             break
     is_low_straight = True
     for index in range(4):
-        if alt_lookup.index(hand[index].face) + 1 != alt_lookup.index(hand[index + 1].face):
+        if alt_lookup.index(hand[index].value) + 1 != alt_lookup.index(hand[index + 1].value):
             is_low_straight = False
             break
     if is_high_straight:
@@ -514,7 +589,7 @@ def max_hand(hand):
         return encode_hand_value((2, pair_value) + tuple(sorted(kicker_values, reverse = True)))
     
     #No good hand, must use high card
-    return encode_hand_value((1, ) + tuple(sorted([lookup.index(c.face) for c in hand], reverse = True)))
+    return encode_hand_value((1, ) + tuple(sorted([lookup.index(c.value) for c in hand], reverse = True)))
 
 def compare_hands(hand1, hand2):
     """
