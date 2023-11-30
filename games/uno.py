@@ -349,6 +349,7 @@ class UnoManager(GameManager):
         # Go to next turn
         await self.next_turn()
 
+
     async def next_turn(self):
         '''
         next_turn: This method calls the update_turn_index() several times,
@@ -457,13 +458,15 @@ class UnoManager(GameManager):
     
     async def end_game(self, interaction):
         await self.announce(interaction.user.display_name + " won! Game game, nerds.")
-        #self.quit_game(interaction)
+        await self.quit_game(interaction)
+        '''
         # then initiate the endgame phase
         self.game.game_state = 7
         restart_ui = QuitGameButton(self)
         active_msg = await self.channel.send("Play again?", view=restart_ui)
         await restart_ui.wait()
         await active_msg.edit(view=None)
+        '''
 
 
          #######################################################
@@ -491,7 +494,7 @@ class UnoButtonsBase(discord.ui.View):
         """
         # print when someone presses the button because otherwise
         # pylint won't shut up about button being unused
-        print(f"{interaction.user} pressed {button.label}!")
+        self.manager.quick_log(f"{interaction.user} pressed {button.label}!")
 
         indi_player_data = UnoPlayer()
         await self.manager.add_player(interaction, indi_player_data)
@@ -503,7 +506,7 @@ class UnoButtonsBase(discord.ui.View):
         """
         # print when someone presses the button because otherwise
         # pylint won't shut up about button being unused
-        print(f"{interaction.user} pressed {button.label}!")
+        self.manager.quick_log(f"{interaction.user} pressed {button.label}!")
         # remove current players from active player list
         await self.manager.remove_player(interaction)
     
@@ -514,7 +517,7 @@ class UnoButtonsBase(discord.ui.View):
         """
         # print when someone presses the button because otherwise
         # pylint won't shut up about button being unused
-        print(f"{interaction.user} pressed {button.label}!")
+        self.manager.quick_log(f"{interaction.user} pressed {button.label}!")
         # start the game
         await self.manager.start_game(interaction)
 
@@ -540,10 +543,9 @@ class UnoButtonsBaseGame(discord.ui.View):
             self.manager.game.player_data[interaction.user].active_interaction = None
 
         # Send user a new "Show Hand" menu
-        print(f"{interaction.user} pressed {button.label}!")
+        self.manager.quick_log(f"{interaction.user} pressed {button.label}!")
         view = UnoCardButtons(self.manager, interaction.user)
-        await interaction.response.send_message("Your cards:", view = view, ephemeral = True,
-                                                delete_after = 20)
+        await interaction.response.send_message("Your cards:", view = view, ephemeral = True)
         
         # We track this interaction so we can delete the message if player presses "Draw"
         #    rather than waiting for the message to delete itself after 20 seconds
@@ -551,7 +553,7 @@ class UnoButtonsBaseGame(discord.ui.View):
         # wait for the view to call self.stop() before we move beyond this point
         await view.wait()
         # delete the response to the card button press (the UnoCardButtons UI message)
-        if not interaction.is_expired(): await interaction.delete_original_response()
+        await interaction.delete_original_response()
         self.manager.game.player_data[interaction.user].active_interaction = None
 
     @discord.ui.button(label = "Draw", style = discord.ButtonStyle.blurple)
@@ -576,7 +578,11 @@ class UnoButtonsBaseGame(discord.ui.View):
         card_drawn = await self.manager.draw_cards(player)
         await interaction.response.send_message("You drew a " + self.manager.color_to_emoji(card_drawn) + " " + card_drawn.value, ephemeral = True,
                                                 delete_after = 2)
+        
+        # Announce that player has opted to draw a card and proceed to next turn
+        await self.manager.announce(str(interaction.user) + " is drawing a card...")
         await self.manager.next_turn()
+        
 
 
 
@@ -608,7 +614,7 @@ class CardButton(discord.ui.Button):
         self.disabled = disabled
         
     async def callback(self, interaction: discord.Interaction):
-        print(f"{interaction.user} pressed {str(self.card)}!")
+        self.manager.quick_log(f"{interaction.user} pressed {str(self.card)}!")
         assert self.view is not None
         view: UnoCardButtons = self.view
         await self.manager.play_card(interaction, self.card)
@@ -625,7 +631,7 @@ class UnoWildCard(discord.ui.View):
         """
         Chnages the wild card to red.
         """
-        print(f"{interaction.user} pressed {button.label}!")
+        self.manager.quick_log(f"{interaction.user} pressed {button.label}!")
         self.manager.game.top_card = Card("Red", "Card")
         self.stop()
         
@@ -634,7 +640,7 @@ class UnoWildCard(discord.ui.View):
         """
         Chnages the wild card to blue.
         """
-        print(f"{interaction.user} pressed {button.label}!")
+        self.manager.quick_log(f"{interaction.user} pressed {button.label}!")
         self.manager.game.top_card = Card("Blue", "Card")
         self.stop()
         
@@ -643,7 +649,7 @@ class UnoWildCard(discord.ui.View):
         """
         Chnages the wild card to yellow.
         """
-        print(f"{interaction.user} pressed {button.label}!")
+        self.manager.quick_log(f"{interaction.user} pressed {button.label}!")
         self.manager.game.top_card = Card("Yellow", "Card")
         self.stop()
         
@@ -652,7 +658,7 @@ class UnoWildCard(discord.ui.View):
         """
         Chnages the wild card to green.
         """
-        print(f"{interaction.user} pressed {button.label}!")
+        self.manager.quick_log(f"{interaction.user} pressed {button.label}!")
         self.manager.game.top_card = Card("Green", "Card")
         self.stop()
 
@@ -672,7 +678,7 @@ class QuitGameButton(discord.ui.View):
         """
         # print when someone presses the button because otherwise
         # pylint won't shut up about button being unused
-        print(f"{interaction.user} pressed {button.label}!")
+        self.manager.quick_log(f"{interaction.user} pressed {button.label}!")
         # stop accepting input
         self.stop()
         await self.manager.start_new_round(interaction)
@@ -684,8 +690,8 @@ class QuitGameButton(discord.ui.View):
         """
         # print when someone presses the button because otherwise
         # pylint won't shut up about button being unused
-        print(f"{interaction.user} pressed {button.label}!")
-        # stop eccepting input
+        self.manager.quick_log(f"{interaction.user} pressed {button.label}!")
+        # stop accepting input
         self.stop()
         await interaction.channel.send(f"{interaction.user.mention} ended the game!")
         await self.manager.quit_game(interaction)
