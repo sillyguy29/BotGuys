@@ -47,6 +47,7 @@ class PokerGame(BaseGame):
         self.pool = 0
         self.largest_bet = 0
         self.turn_order = []
+        self.active_player_turn_order = self.turn_order
         self.turn_index = 0
         self.best_hand = []
         random.shuffle(self.deck)
@@ -58,7 +59,9 @@ class PokerGame(BaseGame):
                 f"\tcommunity: {self.community_cards}\n"
                 f"\tpool: {self.pool}\n"
                 f"\tlargest_bet: {self.largest_bet}\n"
-                f"\tturn_order: {self.turn_order}\n")
+                f"\tturn_order: {self.turn_order}\n"
+                f"\tactive_turn_order: {self.active_player_turn_order}\n"
+                )
         ret += self.get_player_debug_strs()
         return ret
 
@@ -128,7 +131,7 @@ class PokerManager(GameManager):
         
         # check to see if it is the user's turn
         user = interaction.user
-        if self.game.turn_order[self.game.turn_index] != user:
+        if self.game.active_player_turn_order[self.game.turn_index] != user:
             await send_info_message("This is not your turn yet.", interaction)
             return 
 
@@ -204,6 +207,7 @@ class PokerManager(GameManager):
             ret += f"{self.game.largest_bet}\n"
             ret += "Pool:\n"
             ret += f"{self.game.pool}\n"
+            ret += f"It's {self.game.active_player_turn_order[self.game.turn_index].mention}'s turn to bet!\n"
             return ret
         
         elif self.game.game_state == 6:
@@ -315,9 +319,6 @@ class ButtonsBetPhase(discord.ui.View):
     def __init__(self, manager, player_count):
         super().__init__()
         self.manager = manager
-        self.total_player_count = player_count
-        self.active_player_count = player_count
-        self.players_with_bets = 0
     
     async def next_player(self, interaction: discord.Interaction):
         """
@@ -325,9 +326,9 @@ class ButtonsBetPhase(discord.ui.View):
         the manager moves to the dealing phase
         """
         self.manager.game.turn_index += 1
-        if self.manager.game.turn_index == self.active_player_count:
+        if self.manager.game.turn_index >= len(self.manager.game.active_player_turn_order):
             self.manager.game.turn_index = 0
-            if self.active_player_count == 0:
+            if len(self.manager.game.active_player_turn_order) == 0:
                 self.manager.finalize_game()
             else:
                 bet_set = True 
@@ -339,9 +340,6 @@ class ButtonsBetPhase(discord.ui.View):
                     if self.manager.game.game_state == 5:
                         self.manager.game.game_state = 6
                     await self.manager.deal_table(interaction)
-                next_user = self.manager.game.turn_order[self.manager.game.turn_index]
-                if (self.manager.game.player_data[next_user].active) == False:
-                    self.next_player()
     
             
     
@@ -382,10 +380,11 @@ class ButtonsBetPhase(discord.ui.View):
         """
         print(f"{interaction.user} pressed {button.label}!")
         #Fold
-        self.active_player_count -= 1
         self.manager.game.player_data[interaction.user].active = False
+        self.manager.game.active_player_turn_order.remove(interaction.user)
         self.manager.base_gui = None
         await interaction.response.send_message(f"{interaction.user.mention} has folded!")
+        await self.next_player(interaction)
 
 
 
