@@ -349,6 +349,7 @@ class UnoManager(GameManager):
         # Go to next turn
         await self.next_turn()
 
+
     async def next_turn(self):
         '''
         next_turn: This method calls the update_turn_index() several times,
@@ -577,7 +578,11 @@ class UnoButtonsBaseGame(discord.ui.View):
         card_drawn = await self.manager.draw_cards(player)
         await interaction.response.send_message("You drew a " + self.manager.color_to_emoji(card_drawn) + " " + card_drawn.value, ephemeral = True,
                                                 delete_after = 2)
+        
+        # Announce that player has opted to draw a card and proceed to next turn
+        await self.manager.announce(str(interaction.user) + " is drawing a card...")
         await self.manager.next_turn()
+        
 
 
 
