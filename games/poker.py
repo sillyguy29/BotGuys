@@ -218,7 +218,7 @@ class PokerManager(GameManager):
                     self.game.winner = player.display_name
                     self.game.best_hand = winning_hand
                 else:
-                    if best_hand(winning_hand, self.game.community_cards) > best_hand(self.game.player_data[player].hand, self.game.community_cards):
+                    if best_hand(winning_hand, self.game.community_cards) < best_hand(self.game.player_data[player].hand, self.game.community_cards):
                         winning_hand = self.game.player_data[player].hand
                         self.game.winner = player.display_name
                         self.game.best_hand = winning_hand
