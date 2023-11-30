@@ -1,4 +1,5 @@
 import random
+import logging
 import discord
 
 class Card:
@@ -161,4 +162,6 @@ async def send_info_message(content, interaction):
     Sends a 10-second ephemeral message with the content specified
     in response to user input (usually to deny operations)
     """
+    logging.debug("[%i] User [%s] sent info message with content [%s]",
+                  interaction.channel_id, interaction.user.name, content)
     await interaction.response.send_message(content=content, ephemeral=True, delete_after=10)
