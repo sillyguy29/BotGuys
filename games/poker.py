@@ -116,6 +116,9 @@ class PokerManager(GameManager):
         Reset the game state to player join phase
         """
         self.game.game_state = 1
+        active = False
+        if len(self.game.active_player_turn_order) != 0:
+            active = True
 
         for player in self.game.turn_order:
             self.game.player_data[player].hand = []
@@ -134,7 +137,8 @@ class PokerManager(GameManager):
         random.shuffle(self.game.deck)
         # allow players to join
         self.base_gui = PokerButtonsBase(self)
-        await self.resend(interaction)
+        if not active:
+            await self.resend(interaction)
 
     async def deal_cards(self, interaction):
         # make sure we're at the end of the betting phase
