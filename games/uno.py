@@ -4,12 +4,13 @@ Contains all the logic needed to run a game of Uno.
 It features an closed game model, meaning not all users can interact
 with the game at any time, and there is player management.
 """
+import random
 import discord
 from games.game import BaseGame
 from games.game import GameManager
 from games.game import BasePlayer
 from util import Card
-import random
+
 
 
 class UnoPlayer(BasePlayer):
@@ -28,15 +29,19 @@ class UnoPlayer(BasePlayer):
     """
     def __init__(self):
         super().__init__()
-    
         self.hand = []
         self.skipped = False
         self.active_interaction = None
-        
+
     def get_playable_cards(self, top_card):
-        playable_cards = [card for card in self.hand if card.name == top_card.name or card.value == top_card.value or card.name == "Wild"]
+        """
+        Used by the button menu to determine which cards can be
+        enabled.
+        """
+        playable_cards = [card for card in self.hand if card.name == top_card.name \
+            or card.value == top_card.value or card.name == "Wild"]
         return playable_cards
-        
+
 
 class UnoGame(BaseGame):
     """
@@ -60,15 +65,15 @@ class UnoGame(BaseGame):
     def __init__(self):
         # game state 1 -> accepting players but not playing yet
         super().__init__(game_type=3, player_data={}, game_state=1)
-        
+
         self.deck = []
         self.discard = []
         self.turn_order = []
         self.turn_index = 0
         self.reversed = False
         self.top_card = UnoCard("None", "")
-      
-        
+
+
 class UnoManager(GameManager):
     '''
     Uno game model class that controls the flow of Uno by interacting
@@ -94,7 +99,7 @@ class UnoManager(GameManager):
     def __init__(self, factory, channel):
         super().__init__(game=UnoGame(), base_gui=UnoButtonsBase(self),
                          channel=channel, factory=factory)
-        
+
     async def add_player(self, interaction, init_player_data=None):
         '''
         add_player: Called when a person presses the "Join" button.
@@ -119,7 +124,7 @@ class UnoManager(GameManager):
         # if nobody else is left, then quit the game
         if self.game.players == 0:
             await self.quit_game(interaction)
-    
+
     async def start_game(self, interaction):
         '''
         start_game: Called when a person presses the "Start Game"
@@ -137,7 +142,7 @@ class UnoManager(GameManager):
         # setup the game board
         await self.setup()
         await self.resend(interaction)
-        
+
     def get_base_menu_string(self):
         '''
         get_base_menu_string: Used to update the base_gui's message by 
@@ -146,10 +151,11 @@ class UnoManager(GameManager):
         if self.game.game_state == 1:
             return "Welcome to this game of Uno. Feel free to join."
         elif self.game.game_state == 4:
-            output = f"Top Card: {self.card_to_emoji(self.game.top_card)} \n It's {self.game.turn_order[self.game.turn_index]} turn!"
+            output = f"Top Card: {self.card_to_emoji(self.game.top_card)} \n \
+                It's {self.game.turn_order[self.game.turn_index]} turn!"
             return output
         return "Game has started!"
-       
+
     async def start_new_round(self, interaction):
         """
         start_new_round: Reset the game state to player join phase.
@@ -161,7 +167,7 @@ class UnoManager(GameManager):
         # allow players to join
         self.base_gui = UnoButtonsBase(self)
         await self.resend(interaction)
-    
+
     async def setup(self):
         '''
         setup: Called before allowing the player to actually play a 
@@ -183,11 +189,15 @@ class UnoManager(GameManager):
         while True:
             self.game.top_card = self.game.deck.pop()
             top_card_is_valid = True
-            if (self.game.top_card.value == "Reverse"): top_card_is_valid = False
-            if (self.game.top_card.value == "Skip"): top_card_is_valid = False
-            if (self.game.top_card.value == "Draw Two"): top_card_is_valid = False
-            if (self.game.top_card.name == "Wild"): top_card_is_valid = False
-            if not top_card_is_valid: 
+            if self.game.top_card.value == "Reverse":
+                top_card_is_valid = False
+            if self.game.top_card.value == "Skip":
+                top_card_is_valid = False
+            if self.game.top_card.value == "Draw Two":
+                top_card_is_valid = False
+            if self.game.top_card.name == "Wild":
+                top_card_is_valid = False
+            if not top_card_is_valid:
                 self.game.discard.append(self.game.top_card)
                 continue
             else:
@@ -206,15 +216,16 @@ class UnoManager(GameManager):
         players hand. Otherwise, it defaults to adding only 1 card.
         '''
         self.quick_log("A player is drawing cards...")
-        for i in range(num_cards):
-            if len(self.game.deck) == 0: 
+        for _ in range(num_cards):
+            if len(self.game.deck) == 0:
                 await self.announce("The deck is empty! Shuffling in the discard pile...")
                 self.regenerate_deck()
             card = self.game.deck.pop()
             player.hand.append(card)
             player.hand = sorted(player.hand)
-        if num_cards == 1: return card
-    
+        if num_cards == 1:
+            return card
+
     def regenerate_deck(self):
         '''
         regenerate_deck: This method is called by draw_cards() to 
@@ -224,15 +235,15 @@ class UnoManager(GameManager):
         '''
         self.quick_log("Regenerating the deck...")
         random.shuffle(self.game.discard)
-        self.game.deck += self.game.discard 
+        self.game.deck += self.game.discard
         self.game.discard.clear()
-    
+
     def get_player_hand(self, player):
         '''
         get_player_hand: Easy method to see player's hand.
         '''
         return self.game.player_data[player].hand
-    
+
     def update_turn_index(self):
         '''
         update_turn_index: Called after a player plays a card. This
@@ -252,7 +263,7 @@ class UnoManager(GameManager):
             if index == -1:
                 index = len(self.game.turn_order) - 1
             self.game.turn_index = index
-    
+
     def get_next_turn_index(self):
         '''
         get_next_turn_index: This method tells us who the next player
@@ -274,7 +285,7 @@ class UnoManager(GameManager):
             if next_player == -1:
                 next_player = len(self.game.turn_order) - 1
             return next_player
-    
+
     async def play_card(self, interaction, card):
         '''
         play_card: This method is called when a player presses a 
@@ -302,14 +313,15 @@ class UnoManager(GameManager):
         be desired in this area.
         '''
         self.quick_log("A player is playing a card...")
-        # We put add the top card to the discard pile, 
-        # but only if it's not a placeholder card        
-        if (self.game.top_card.value != "Card"):
+        # We put add the top card to the discard pile,
+        # but only if it's not a placeholder card
+        if self.game.top_card.value != "Card":
             self.game.discard.append(self.game.top_card)
         # Then we can replace the top card with the played card, unless it's wild
-        if (card.name == "Wild"): 
+        if card.name == "Wild":
             view = UnoWildCard(self) # Menu to inquire what the next card is
-            await interaction.response.send_message("Choose a color!", view = view, ephemeral=True, delete_after=10)
+            await interaction.response.send_message("Choose a color!", view = view, \
+                ephemeral=True, delete_after=10)
             await view.wait()
             await interaction.delete_original_response()
         else: # Not wild, just replace
@@ -342,7 +354,8 @@ class UnoManager(GameManager):
         player = self.game.player_data[interaction.user]
         player.hand.remove(card)
         if len(player.hand) == 1:
-            await self.announce("Oh fuck! " + interaction.user.display_name + " has only one card left!")
+            await self.announce("Oh fuck! " + interaction.user.display_name + \
+                " has only one card left!")
         if len(player.hand) == 0:
             await self.end_game(interaction)
             return
@@ -359,9 +372,9 @@ class UnoManager(GameManager):
         turn.
         '''
         self.quick_log("Going to the next turn...")
-        # Increment (or decrement if turn order reversed) the turn index 
+        # Increment (or decrement if turn order reversed) the turn index
         self.update_turn_index()
-    
+
         # Check if player is skipped. If so, move on to the next player
         next_player = self.game.player_data[self.game.turn_order[self.game.turn_index]]
         while next_player.skipped:
@@ -455,18 +468,14 @@ class UnoManager(GameManager):
         elif card.name == "Wild":
             return "🌈"
         return "🟣"
-    
+
     async def end_game(self, interaction):
+        """
+        Ends the game.
+        """
         await self.announce(interaction.user.display_name + " won! Game game, nerds.")
         await self.quit_game(interaction)
-        '''
-        # then initiate the endgame phase
-        self.game.game_state = 7
-        restart_ui = QuitGameButton(self)
-        active_msg = await self.channel.send("Play again?", view=restart_ui)
-        await restart_ui.wait()
-        await active_msg.edit(view=None)
-        '''
+
 
 
          #######################################################
@@ -481,8 +490,8 @@ class UnoButtonsBase(discord.ui.View):
     """
     def __init__(self, manager):
         super().__init__()
-        self.manager = manager    
-    
+        self.manager = manager
+
     @discord.ui.button(label = "Join", style = discord.ButtonStyle.green)
     async def join(self, interaction: discord.Interaction, button: discord.ui.Button):
         """
@@ -498,7 +507,7 @@ class UnoButtonsBase(discord.ui.View):
 
         indi_player_data = UnoPlayer()
         await self.manager.add_player(interaction, indi_player_data)
-    
+
     @discord.ui.button(label = "Quit", style = discord.ButtonStyle.red)
     async def quit(self, interaction: discord.Interaction, button: discord.ui.Button):
         """
@@ -509,7 +518,7 @@ class UnoButtonsBase(discord.ui.View):
         self.manager.quick_log(f"{interaction.user} pressed {button.label}!")
         # remove current players from active player list
         await self.manager.remove_player(interaction)
-    
+
     @discord.ui.button(label = "Start Game", style = discord.ButtonStyle.blurple)
     async def start(self, interaction: discord.Interaction, button: discord.ui.Button):
         """
@@ -523,10 +532,14 @@ class UnoButtonsBase(discord.ui.View):
 
 
 class UnoButtonsBaseGame(discord.ui.View):
+    """
+    Menu includes "Show Hand" and "Draw"
+    In the future: Include "Quit" button here as well.
+    """
     def __init__(self, manager):
         super().__init__()
         self.manager = manager
-        
+
     @discord.ui.button(label = "Show Hand", style = discord.ButtonStyle.green)
     async def show_cards(self, interaction: discord.Interaction, button: discord.ui.Button):
         """
@@ -536,17 +549,18 @@ class UnoButtonsBaseGame(discord.ui.View):
         has passed (prevents menus that are not accounted for after
         game end).
         """
-        
+
         # Delete prior "Show Hand" menu so there isn't several lingering
-        if (self.manager.game.player_data[interaction.user].active_interaction):
-            await self.manager.game.player_data[interaction.user].active_interaction.delete_original_response()
-            self.manager.game.player_data[interaction.user].active_interaction = None
+        uno_player = self.manager.game.player_data[interaction.user]
+        if uno_player.active_interaction:
+            await uno_player.active_interaction.delete_original_response()
+            uno_player.active_interaction = None
 
         # Send user a new "Show Hand" menu
         self.manager.quick_log(f"{interaction.user} pressed {button.label}!")
         view = UnoCardButtons(self.manager, interaction.user)
         await interaction.response.send_message("Your cards:", view = view, ephemeral = True)
-        
+
         # We track this interaction so we can delete the message if player presses "Draw"
         #    rather than waiting for the message to delete itself after 20 seconds
         self.manager.game.player_data[interaction.user].active_interaction = interaction
@@ -565,24 +579,27 @@ class UnoButtonsBaseGame(discord.ui.View):
         # Reject request to draw cards if button presser is not the current turn player
         current_turn_player = self.manager.game.turn_order[self.manager.game.turn_index]
         if interaction.user != current_turn_player:
-            await interaction.response.send_mesage("Wait your turn.", ephemeral = True, delete_after = 2)
+            await interaction.response.send_mesage("Wait your turn.", ephemeral = True, \
+                delete_after = 2)
             return
 
         # If there is an active "Show Hand" menu, we should delete it now
-        if (self.manager.game.player_data[interaction.user].active_interaction):
-            await self.manager.game.player_data[interaction.user].active_interaction.delete_original_response()
-            self.manager.game.player_data[interaction.user].active_interaction = None
-            
+        uno_player = self.manager.game.player_data[interaction.user]
+        if uno_player.active_interaction:
+            await uno_player.active_interaction.delete_original_response()
+            uno_player.active_interaction = None
+
         # If the button presser IS the turn player, do the following:
         player = self.manager.game.player_data[interaction.user]
         card_drawn = await self.manager.draw_cards(player)
-        await interaction.response.send_message("You drew a " + self.manager.color_to_emoji(card_drawn) + " " + card_drawn.value, ephemeral = True,
-                                                delete_after = 2)
-        
+        msg = button.label + "! You drew a " + self.manager.color_to_emoji(card_drawn) \
+            + " " + card_drawn.value
+        await interaction.response.send_message(msg, ephemeral = True, delete_after = 2)
+
         # Announce that player has opted to draw a card and proceed to next turn
         await self.manager.announce(str(interaction.user) + " is drawing a card...")
         await self.manager.next_turn()
-        
+
 
 
 
@@ -594,25 +611,27 @@ class UnoCardButtons(discord.ui.View):
         super().__init__()
         self.manager = manager
         self.player_hand = self.manager.get_player_hand(player)
-        
-        for i in range(len(self.player_hand)):
-            current_turn_player = self.manager.game.turn_order[self.manager.game.turn_index]
-            this_card = self.player_hand[i]
-            playable_cards = self.manager.game.player_data[player].get_playable_cards(self.manager.game.top_card)
-            disabled = (player != current_turn_player) or (this_card not in playable_cards)
-            self.add_item(CardButton(self.manager, self.player_hand[i], disabled))
 
-  
+        for card in self.player_hand:
+            current_turn_player = self.manager.game.turn_order[self.manager.game.turn_index]
+            uno_player = self.manager.game.player_data[player]
+            playable_cards = uno_player.get_playable_cards(self.manager.game.top_card)
+            disabled = (player != current_turn_player) or (card not in playable_cards)
+            self.add_item(CardButton(self.manager, card, disabled))
+
+
+
 class CardButton(discord.ui.Button):
     """
     Button class that represents an individual card in a user's hand
     """
     def __init__(self, manager, card, disabled=True):
-        super().__init__(style=discord.ButtonStyle.gray, label=f"{card.value}", emoji=manager.color_to_emoji(card))
+        super().__init__(style=discord.ButtonStyle.gray, label=f"{card.value}", \
+            emoji=manager.color_to_emoji(card))
         self.manager = manager
         self.card = card
         self.disabled = disabled
-        
+
     async def callback(self, interaction: discord.Interaction):
         self.manager.quick_log(f"{interaction.user} pressed {str(self.card)}!")
         assert self.view is not None
@@ -622,41 +641,45 @@ class CardButton(discord.ui.Button):
 
 
 class UnoWildCard(discord.ui.View):
+    """
+    This is the menu that appears when the player plays a Wild card
+    to prompt them to select a color for the next card.
+    """
     def __init__(self, manager):
         super().__init__()
         self.manager = manager
-        
+
     @discord.ui.button(label = "Red", style = discord.ButtonStyle.gray, emoji = "🔴")
     async def red(self, interaction: discord.Interaction, button: discord.ui.Button):
         """
-        Chnages the wild card to red.
+        Changes the wild card to red.
         """
         self.manager.quick_log(f"{interaction.user} pressed {button.label}!")
         self.manager.game.top_card = Card("Red", "Card")
         self.stop()
-        
+
     @discord.ui.button(label = "Blue", style = discord.ButtonStyle.gray, emoji = "🔵")
     async def blue(self, interaction: discord.Interaction, button: discord.ui.Button):
         """
-        Chnages the wild card to blue.
+        Changes the wild card to blue.
         """
         self.manager.quick_log(f"{interaction.user} pressed {button.label}!")
         self.manager.game.top_card = Card("Blue", "Card")
         self.stop()
-        
+
     @discord.ui.button(label = "Yellow", style = discord.ButtonStyle.gray, emoji = "🟡")
     async def yellow(self, interaction: discord.Interaction, button: discord.ui.Button):
         """
-        Chnages the wild card to yellow.
+        Changes the wild card to yellow.
         """
         self.manager.quick_log(f"{interaction.user} pressed {button.label}!")
         self.manager.game.top_card = Card("Yellow", "Card")
         self.stop()
-        
+
     @discord.ui.button(label = "Green", style = discord.ButtonStyle.gray, emoji = "🟢")
     async def green(self, interaction: discord.Interaction, button: discord.ui.Button):
         """
-        Chnages the wild card to green.
+        Changes the wild card to green.
         """
         self.manager.quick_log(f"{interaction.user} pressed {button.label}!")
         self.manager.game.top_card = Card("Green", "Card")
@@ -698,39 +721,55 @@ class QuitGameButton(discord.ui.View):
 
 
 class UnoCard(Card):
+    """
+    This class represents an Uno card. On construction, it uses its
+    name and value to establish a priority, used for sorting in a list.
+    """
     def __init__(self, name, value):
         super().__init__(name, value)
-        
-        self.priority = 0
-        if self.name == "Red": self.priority += 0
-        if self.name == "Blue": self.priority += 15
-        if self.name == "Green": self.priority += 30
-        if self.name == "Yellow": self.priority += 45
-        if self.name == "Wild": self.priority += 60
 
-        if self.value == "Reverse": self.priority += 11
-        elif self.value == "Skip": self.priority += 12
-        elif self.value == "Draw Two": self.priority += 13
-        elif self.value == "Card": self.priority += 1
-        elif self.value == "Draw Four": self.priority += 2
-        elif self.value == "Wild": self.priority += 0
-        elif self.value == "": self.priority += 0
+        self.priority = 0
+        if self.name == "Red":
+            self.priority += 0
+        if self.name == "Blue":
+            self.priority += 15
+        if self.name == "Green":
+            self.priority += 30
+        if self.name == "Yellow":
+            self.priority += 45
+        if self.name == "Wild":
+            self.priority += 60
+
+        if self.value == "Reverse":
+            self.priority += 11
+        elif self.value == "Skip":
+            self.priority += 12
+        elif self.value == "Draw Two":
+            self.priority += 13
+        elif self.value == "Card":
+            self.priority += 1
+        elif self.value == "Draw Four":
+            self.priority += 2
+        elif self.value == "Wild":
+            self.priority += 0
+        elif self.value == "":
+            self.priority += 0
         else: self.priority += int(self.value)
-    
+
     def __str__(self):
         return f"{self.name} {self.value}"
-    
+
     def __eq__(self, other):
-        if not isinstance(other, Card): return False
-        if self.name != other.name: return False
-        if self.value != other.value: return False
+        if not isinstance(other, Card):
+            return False
+        if self.name != other.name:
+            return False
+        if self.value != other.value:
+            return False
         return True
-    
+
     def __lt__(self, other):
         return self.priority < other.priority
 
     def __gt__(self, other):
         return self.priority > other.priority
-    
-    
-
