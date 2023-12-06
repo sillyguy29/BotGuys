@@ -343,7 +343,6 @@ class GameManager():
         Normally appends channel id, game type, and game state, but can
         also append a username if an interaction is passed.
         """
-        
         log_content = f"[{self.channel.id}](gt,gs:{self.game.game_type},{self.game.game_state})"
         if interaction is not None:
             log_content += f"(user:{interaction.user}) " + content

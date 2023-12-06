@@ -91,6 +91,7 @@ class BlackjackGame(BaseGame):
         self.dealer_hand = []
         self.dealer_hidden_card = None
         self.turn_index = -1
+        self.betted_players = 0
 
     def get_active_player(self):
         """
@@ -156,7 +157,7 @@ class BlackjackManager(GameManager):
         self.game.game_state = 4
         # swap default GUI to betting phase buttons
         await interaction.channel.send(f"{interaction.user.display_name} started the game!")
-        self.base_gui = ButtonsBetPhase(self, self.game.players)
+        self.base_gui = ButtonsBetPhase(self)
         await self.resend(interaction)
 
     async def start_new_round(self, interaction):
@@ -378,9 +379,9 @@ class BlackjackManager(GameManager):
         await interaction.channel.send((f"{user.mention} has bet {str(bet_amount)} "
                                         f"chips and now has {str(user_data.chips)} "
                                         "chips left!"))
-        # Update the view so it knows how many players have bet
-        # TODO: this solution is janky as fuck pls fix maybe
-        await self.base_gui.add_betted_player()
+        self.game.betted_players += 1
+        if self.game.players == self.game.betted_players:
+            await self.deal_cards()
         return
 
     async def dealer_draw(self):
@@ -595,20 +596,9 @@ class ButtonsBetPhase(discord.ui.View):
     Contains the "bet" button and also keeps track of players who have
     placed bets
     """
-    def __init__(self, manager, player_count):
+    def __init__(self, manager):
         super().__init__()
         self.manager = manager
-        self.player_count = player_count
-        self.players_with_bets = 0
-
-    async def add_betted_player(self):
-        """
-        Add a player to the bet count, once all players have bet,
-        the manager moves to the dealing phase
-        """
-        self.players_with_bets += 1
-        if self.players_with_bets == self.player_count:
-            await self.manager.deal_cards()
 
     @discord.ui.button(label = "Bet!", style = discord.ButtonStyle.green)
     async def bet(self, interaction: discord.Interaction, button: discord.ui.Button):
