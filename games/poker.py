@@ -4,22 +4,40 @@ Contains all the logic needed to run a game of Texas Hold'em Poker.
 It features an closed game model, meaning not all users can interact
 with the game at any time, and there is player management.
 """
+import random
+from itertools import combinations
 import discord
 from games.game import BaseGame
 from games.game import GameManager
 from games.game import BasePlayer
-from util import Card
 from util import double_check
 from util import STANDARD_52_DECK
 from util import cards_to_str_52_standard
 from util import send_info_message
 from util import generate_deck
-import random
-from itertools import combinations
-import copy
 
 class PokerPlayer(BasePlayer):
+    """
+    Represents a player in a game of poker.
+    A brief overview of its attributes and methods:
+    Attributes:
+    1. hand (list): The player's hand of cards.
+    2. chips (int): The number of chips the player has.
+    3. round_bet (int): The amount of chips the player has bet in the current round.
+    4. total_bet (int): The total amount of chips the player has bet.
+    5. is_cpu (bool): Specifies whether the player is controlled by the CPU.
+    6. active (bool): Specifies whether the player is active in the game.
+    Methods:
+    1. get_debug_str: Returns a string representation of the player's debug information.
+    """
     def __init__(self, is_cpu=False):
+        """
+        Initializes a PokerPlayer object.
+
+        Args:
+            is_cpu (bool, optional): Specifies whether the player is controlled 
+            by the CPU. Defaults to False.
+        """
         super().__init__()
         self.hand = []
         self.chips = 10000
@@ -29,6 +47,12 @@ class PokerPlayer(BasePlayer):
         self.active = True #Inactive when they fold
 
     def get_debug_str(self):
+        """
+        Returns a string representation of the player's debug information.
+
+        Returns:
+            str: A string containing the hand, chips, round bet, total bet, and active status.
+        """
         return (f"\t\thand: {self.hand}\n"
                 f"\t\tchips: {self.chips}\n"
                 f"\t\tround_bet: {self.round_bet}\n"
@@ -37,12 +61,25 @@ class PokerPlayer(BasePlayer):
 
 class PokerGame(BaseGame):
     """
-    Poker game model class. Keeps track of the deck and bets
+    Represents a game of poker.
+    A brief overview of its attributes and methods:
+    Attributes:
+    1. deck (list): The deck of cards.
+    2. community_cards (list): The community cards.
+    3. pool (int): The number of chips in the pool.
+    4. largest_bet (int): The largest bet in the current round.
+    5. turn_order (list): The order of players in the game.
+    6. active_player_turn_order (list): The order of active players in the game.
+    7. turn_index (int): The index of the current player in the turn order.
+    8. best_hand (list): The best hand in the game.
+    9. winner (dict): The winner of the game.
+    Methods:
+    1. get_debug_str: Returns a string representation of the game's debug information.
+    2. get_player_debug_strs: Returns a string representation of player data for debugging purposes.
     """
     def __init__(self, cpus):
         # game state 1 -> accepting players but not playing yet
         super().__init__(game_type=1, player_data={}, game_state=1, cpus=cpus)
-        
         self.deck = generate_deck()
         self.community_cards = []
         self.pool = 0
@@ -53,7 +90,6 @@ class PokerGame(BaseGame):
         self.best_hand = []
         self.winner = {}
         random.shuffle(self.deck)
-    
 
     def get_debug_str(self):
         ret = super().get_debug_str()
@@ -68,27 +104,54 @@ class PokerGame(BaseGame):
         return ret
 
     def get_player_debug_strs(self):
+        """
+        Returns a string representation of the player data for debugging purposes.
+
+        Returns:
+            str: A string containing the player data.
+        """
         ret = "Player data:\n"
         for player in self.player_data:
             ret += f"\tPlayer {player.display_name}:\n"
             ret += self.player_data[player].get_debug_str()
-        return ret    
+        return ret
 
-    #def __repr__(self):
- 
-        
 class PokerManager(GameManager):
+    """
+    Represents a manager for a game of poker.
+    A brief overview of its attributes and methods:
+    Attributes:
+    1. game (PokerGame): The game of poker.
+    2. base_gui (PokerButtonsBase): The base GUI for the game.
+    Methods:
+    1. add_player: Adds a player to the game.
+    2. remove_player: Removes a player from the game.
+    3. start_game: Starts the game.
+    4. start_new_round: Starts a new round.
+    5. deal_cards: Deals cards to the players.
+    6. make_bet: Makes a bet.
+    7. deal_table: Deals cards to the table.
+    8. finalize_game: Finalizes the game.
+    9. get_base_menu_string: Returns a string representation of the base menu.
+    10. get_debug_str: Returns a string representation of the manager's debug information.
+    """
     def __init__(self, factory, channel, cpus):
         super().__init__(game=PokerGame(cpus), base_gui=PokerButtonsBase(self),
                          channel=channel, factory=factory)
 
     async def add_player(self, interaction, init_player_data=None):
+        """
+        Adds a player to the game and updates the turn order if necessary.
+        """
         await super().add_player(interaction, init_player_data)
         if interaction.user in self.game.player_data \
         and interaction.user not in self.game.turn_order:
             self.game.turn_order.append(interaction.user)
 
     async def remove_player(self, interaction):
+        """
+        Removes a player from the game and updates the turn order if necessary.
+        """
         await super().remove_player(interaction)
         if interaction.user not in self.game.player_data \
         and interaction.user in self.game.turn_order:
@@ -98,6 +161,9 @@ class PokerManager(GameManager):
             await self.quit_game(interaction)
 
     async def start_game(self, interaction):
+        """
+        Starts the game.
+        """
         if self.game.game_state != 1:
             await send_info_message("This game has already started", interaction)
             return
@@ -105,12 +171,12 @@ class PokerManager(GameManager):
         self.game.game_state = 4
         for player in self.game.turn_order:
             self.game.active_player_turn_order.append(player)
-        
+
         # swap default GUI to betting phase buttons
         await interaction.channel.send(f"{interaction.user.display_name} started the game!")
         await self.deal_cards(interaction)
         await self.resend(interaction)
-    
+
     async def start_new_round(self, interaction):
         """
         Reset the game state to player join phase
@@ -141,6 +207,9 @@ class PokerManager(GameManager):
             await self.resend(interaction)
 
     async def deal_cards(self, interaction):
+        """
+        Deal cards to players
+        """
         # make sure we're at the end of the betting phase
         if self.game.game_state != 4:
             return
@@ -153,7 +222,7 @@ class PokerManager(GameManager):
         for i in self.game.player_data:
             self.game.player_data[i].hand.extend(STANDARD_52_DECK.draw(2))
 
-        self.base_gui = ButtonsBetPhase(self, self.game.players)
+        self.base_gui = ButtonsBetPhase(self)
 
     async def make_bet(self, interaction, bet_amount):
         """
@@ -162,12 +231,12 @@ class PokerManager(GameManager):
         # checks to see if the game is over
         if await self.game_end_check(interaction):
             return
-        
+
         # check to see if it is the user's turn
         user = interaction.user
         if self.game.active_player_turn_order[self.game.turn_index] != user:
             await send_info_message("This is not your turn yet.", interaction)
-            return 
+            return
 
         # check to see if the user can bet, and deny them if not
         user_data = self.game.player_data[user]
@@ -193,11 +262,14 @@ class PokerManager(GameManager):
                                         "chips left!"))
         await self.base_gui.next_player(interaction, False)
         return
-    
+
     async def deal_table(self, interaction):
+        """
+        Deal cards to the table
+        """
         self.game.largest_bet = 0
         if len(self.game.community_cards) == 0:
-           self.game.community_cards.extend(STANDARD_52_DECK.draw(3))
+            self.game.community_cards.extend(STANDARD_52_DECK.draw(3))
 
         elif len(self.game.community_cards) == 5:
             await self.finalize_game(interaction)
@@ -205,8 +277,11 @@ class PokerManager(GameManager):
             self.game.community_cards.extend(STANDARD_52_DECK.draw(1))
         await self.resend(interaction)
         return
-    
+
     async def finalize_game(self, interaction):
+        """
+        End the game
+        """
         self.game.game_state = 7
         self.base_gui = None
 
@@ -218,12 +293,14 @@ class PokerManager(GameManager):
                     self.game.winner = player.display_name
                     self.game.best_hand = winning_hand
                 else:
-                    if best_hand(winning_hand, self.game.community_cards) < best_hand(self.game.player_data[player].hand, self.game.community_cards):
+                    b_1 = best_hand(winning_hand, self.game.community_cards)
+                    b_2 = best_hand(self.game.player_data[player].hand, self.game.community_cards)
+                    if b_1 < b_2:
                         winning_hand = self.game.player_data[player].hand
                         self.game.winner = player.display_name
                         self.game.best_hand = winning_hand
             await self.resend(interaction)
-        
+
         restart_ui = QuitGameButton(self)
         active_msg = await self.channel.send("Play again?", view=restart_ui)
         await restart_ui.wait()
@@ -231,6 +308,9 @@ class PokerManager(GameManager):
         return
 
     def get_base_menu_string(self):
+        """
+        Returns a string representation of the base menu.
+        """
         if self.game.game_state == 1:
             return "Who's ready for a game of poker?"
 
@@ -246,9 +326,10 @@ class PokerManager(GameManager):
             ret += f"{self.game.largest_bet}\n"
             ret += "Pool:\n"
             ret += f"{self.game.pool}\n"
-            ret += f"It's {self.game.active_player_turn_order[self.game.turn_index].mention}'s turn to bet!\n"
+            who_turn = self.game.active_player_turn_order[self.game.turn_index].mention
+            ret += f"It's {who_turn}'s turn to bet!\n"
             return ret
-        
+
         elif self.game.game_state == 6:
             ret = "Community cards:\n"
             ret += f"{cards_to_str_52_standard(self.game.community_cards)}\n"
@@ -257,7 +338,7 @@ class PokerManager(GameManager):
             ret += "Pool:\n"
             ret += f"{self.game.pool}\n"
             return ret
-        
+
         elif self.game.game_state == 7:
             ret = f"{self.game.winner} has WON!\n"
             ret += "Winning hand:\n"
@@ -267,12 +348,15 @@ class PokerManager(GameManager):
             return ret
 
         return "You shouldn't be seeing this."
-    
+
     def get_debug_str(self):
         return super().get_debug_str() + self.game.get_debug_str()
 
-     
+
 class PokerButtonsBase(discord.ui.View):
+    """
+    Button set that asks players if they want to play the game again
+    """
     def __init__(self, manager):
         super().__init__()
         self.manager = manager
@@ -317,6 +401,9 @@ class PokerButtonsBase(discord.ui.View):
 
 
 class PokerButtonsBaseGame(discord.ui.View):
+    """
+    Button set that asks players if they want to play the game again
+    """
     def __init__(self, manager):
         super().__init__()
         self.manager = manager
@@ -333,6 +420,9 @@ class PokerButtonsBaseGame(discord.ui.View):
         await self.manager.resend(interaction)
 
 class BetModal(discord.ui.Modal):
+    """
+    Modal that allows the user to enter a bet
+    """
     def __init__(self, manager):
         super().__init__(title="Bet")
         self.manager = manager
@@ -358,10 +448,13 @@ class BetModal(discord.ui.Modal):
 
 
 class ButtonsBetPhase(discord.ui.View):
-    def __init__(self, manager, player_count):
+    """
+    Button set that allows players to bet
+    """
+    def __init__(self, manager):
         super().__init__()
         self.manager = manager
-    
+
     async def next_player(self, interaction: discord.Interaction, folded):
         """
         Add a player to the bet count, once all players have bet,
@@ -374,10 +467,11 @@ class ButtonsBetPhase(discord.ui.View):
             if len(self.manager.game.active_player_turn_order) == 0:
                 await self.manager.finalize_game(interaction)
             else:
-                bet_set = True 
+                bet_set = True
                 for player in self.manager.game.player_data:
                     if self.manager.game.player_data[player].active \
-                    and self.manager.game.player_data[player].round_bet != self.manager.game.largest_bet:
+                    and (self.manager.game.player_data[player].round_bet !=
+                        self.manager.game.largest_bet):
                         bet_set = False
                 if bet_set:
                     if self.manager.game.game_state == 5:
@@ -385,9 +479,8 @@ class ButtonsBetPhase(discord.ui.View):
                     for player in self.manager.game.turn_order:
                         self.manager.game.player_data[player].round_bet = 0
                     await self.manager.deal_table(interaction)
-    
-            
-    
+
+
     @discord.ui.button(label = "View Hand", style = discord.ButtonStyle.blurple)
     async def hit_me(self, interaction: discord.Interaction, button: discord.ui.Button):
         """
@@ -398,15 +491,17 @@ class ButtonsBetPhase(discord.ui.View):
         current_player = self.manager.game.player_data[interaction.user]
         if len(current_player.hand) != 2:
             raise ValueError("Player hand must contain 2 cards")
-        await interaction.response.send_message(f"Your hand is {cards_to_str_52_standard(current_player.hand)}", ephemeral = True, delete_after = 60)
-    
+        message = f"Your hand is {cards_to_str_52_standard(current_player.hand)}"
+        await interaction.response.send_message(message, ephemeral = True, delete_after = 60)
+
     @discord.ui.button(label = "Call", style = discord.ButtonStyle.green)
     async def call(self, interaction: discord.Interaction, button: discord.ui.Button):
         """
         Call
         """
         print(f"{interaction.user} pressed {button.label}!")
-        await self.manager.make_bet(interaction, self.manager.game.largest_bet - self.manager.game.player_data[interaction.user].round_bet)
+        await self.manager.make_bet(interaction, self.manager.game.largest_bet
+            - self.manager.game.player_data[interaction.user].round_bet)
 
     @discord.ui.button(label = "Raise", style = discord.ButtonStyle.red)
     async def bet(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -502,9 +597,10 @@ def max_hand(hand):
 
     #Check Royal Flush
     if same_suit:
-        if hand[0].value == "10" and hand[1].value == "J" and hand[2].value == "Q" and hand[3].value == "K" and hand[4].value == "A":
+        if (hand[0].value == "10" and hand[1].value == "J"
+            and hand[2].value == "Q" and hand[3].value == "K" and hand[4].value == "A"):
             return encode_hand_value((10, highest_value))
-    
+
     #Check Straight Flush
     if same_suit:
         #Straight Flush uses alt_lookup because if it is not a Royal Flush, A=1 if it is a Flush
@@ -515,8 +611,7 @@ def max_hand(hand):
                 break
         if is_straight:
             return encode_hand_value((9, highest_value))
-    
-    num_same = 0
+
     type_dict = dict()
     for c in hand:
         type_dict[c.value] = type_dict.get(c.value, 0) + 1
@@ -537,8 +632,9 @@ def max_hand(hand):
                 
     #Check Flush
     if same_suit:
-        return encode_hand_value((6, ) + tuple(sorted([lookup.index(c.value) for c in hand], reverse = True)))
-    
+        return encode_hand_value((6, )
+        + tuple(sorted([lookup.index(c.value) for c in hand], reverse = True)))
+
     #Check Straight
     is_high_straight = True
     for index in range(4):
@@ -556,7 +652,7 @@ def max_hand(hand):
         # We use '3' here because if it is a low straight, A=1 and the highest value card
         # is 5 (A,2,3,4,5), which is 3 in the primary lookup list [2,3,4,5,...,A]
         return encode_hand_value((5, 3))
-    
+
     #Check Three of a Kind
     for key in type_dict:
         if type_dict[key] == 3:
@@ -580,7 +676,7 @@ def max_hand(hand):
             else:
                 kicker = lookup.index(key)
         return encode_hand_value((3, ) + tuple(sorted(pair_values, reverse = True)) + (kicker, ))
-    
+
     #Check One Pair
     if num_pairs == 1:
         pair_value = 0
@@ -591,9 +687,10 @@ def max_hand(hand):
             else:
                 kicker_values.append(lookup.index(key))
         return encode_hand_value((2, pair_value) + tuple(sorted(kicker_values, reverse = True)))
-    
+
     #No good hand, must use high card
-    return encode_hand_value((1, ) + tuple(sorted([lookup.index(c.value) for c in hand], reverse = True)))
+    return encode_hand_value((1, )
+    + tuple(sorted([lookup.index(c.value) for c in hand], reverse = True)))
 
 def compare_hands(hand1, hand2):
     """
