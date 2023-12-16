@@ -267,14 +267,14 @@ class BlackjackManager(GameManager):
         if self.game.game_state == 1:
             return "Who's ready for a game of blackjack?"
 
-        elif self.game.game_state == 4:
+        if self.game.game_state == 4:
             ret = "Current bets and chips:\n"
             for player in self.game.turn_order:
                 player_data = self.game.player_data[player]
                 ret += f"{player.display_name}: {player_data.get_bet_phase_str()}\n"
             return ret
 
-        elif self.game.game_state == 5:
+        if self.game.game_state == 5:
             ret = f"Dealer hand: {cards_to_str_52_standard(self.game.dealer_hand)}"
             # no hidden card means we added it to the dealer's hand
             if self.game.dealer_hidden_card is not None:
