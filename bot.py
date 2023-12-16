@@ -3,12 +3,12 @@
 Contains everything that the bot uses at the frontend, including slash
 commands, and starts up the bot.
 """
+import logging
+import datetime
 import discord
 import cmd_control
 from configs import config
 from games import gamefactory
-import logging
-import datetime
 
 
 # Inherit the discord client class so we can override some methods
