@@ -1,7 +1,7 @@
 # BotGuys
-Project made for CSCI 4440 - Software Design &amp; Documentation.
+SD&D project turned RCOS project.
 
-Worked on by Jesse Diaz, Sam Cashman, Pierson Garcia, Michael Pan, and Matthews DeJesus.
+Original bot worked on by Jesse Diaz, Sam Cashman, Pierson Garcia, Michael Pan, and Matthews DeJesus.
 
 Our discord bot, Lantern, will be able to play various card games.
 Can play:
