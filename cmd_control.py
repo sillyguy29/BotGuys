@@ -1,4 +1,5 @@
-"""Terminal menu for managing slash commands
+"""
+Terminal menu for managing slash commands
 
 Contains all the logic needed to sync slash commands.
 """

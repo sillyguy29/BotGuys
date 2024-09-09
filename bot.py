@@ -2,6 +2,8 @@
 
 Contains everything that the bot uses at the frontend, including slash
 commands, and starts up the bot.
+
+Slash commands that are used at this level are transferred to the proper
 """
 import logging
 import datetime
@@ -19,8 +21,11 @@ class LanternClient(discord.Client):
     def __init__(self, *, intents: discord.Intents,
                  cmd_handler=logging.INFO, file_handler=logging.INFO):
         super().__init__(intents=intents)
+        # contains all commands
         self.tree = discord.app_commands.CommandTree(self)
+        # contains the stuff that is used to run games.
         self.game_factory = gamefactory.GameFactory()
+        # logging handlers
         self.cmd_handler = cmd_handler
         self.file_handler = file_handler
 

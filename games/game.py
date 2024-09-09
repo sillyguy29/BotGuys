@@ -17,7 +17,7 @@ class BasePlayer():
 
     def get_debug_str(self):
         """
-        yadda yadda
+        Overridden by subclasses
         """
         return ""
 
