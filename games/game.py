@@ -26,7 +26,7 @@ class BaseGame():
     """
     Game model class. Member vars should only be accessed by its manager or AI functions.
     """
-    def __init__(self, game_type=0, player_data=None, game_state=0, 
+    def __init__(self, game_type=0, player_data=None, game_state=0,
                  user_id=None, players=0, cpus=0, max_players=0):
         # ID value of the game type
         self.game_type = game_type
