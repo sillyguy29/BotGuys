@@ -314,14 +314,14 @@ class PokerManager(GameManager):
         if self.game.game_state == 1:
             return "Who's ready for a game of poker?"
 
-        elif self.game.game_state == 4:
+        if self.game.game_state == 4:
             ret = "Current bets and chips:\n"
             for player in self.game.turn_order:
                 player_data = self.game.player_data[player]
                 ret += f"{player.display_name}: {player_data.get_bet_phase_str()}\n"
             return ret
 
-        elif self.game.game_state == 5:
+        if self.game.game_state == 5:
             ret = "Largest bet:\n"
             ret += f"{self.game.largest_bet}\n"
             ret += "Pool:\n"
@@ -330,7 +330,7 @@ class PokerManager(GameManager):
             ret += f"It's {who_turn}'s turn to bet!\n"
             return ret
 
-        elif self.game.game_state == 6:
+        if self.game.game_state == 6:
             ret = "Community cards:\n"
             ret += f"{cards_to_str_52_standard(self.game.community_cards)}\n"
             ret += "Largest bet:\n"
@@ -339,7 +339,7 @@ class PokerManager(GameManager):
             ret += f"{self.game.pool}\n"
             return ret
 
-        elif self.game.game_state == 7:
+        if self.game.game_state == 7:
             ret = f"{self.game.winner} has WON!\n"
             ret += "Winning hand:\n"
             ret += f"{cards_to_str_52_standard(self.game.best_hand)}\n"
@@ -622,14 +622,14 @@ def max_hand(hand):
             for key2 in type_dict:
                 if key2 != key:
                     return encode_hand_value((8, lookup.index(key), lookup.index(key2)))
-        
+
     #Check Full House
     for key in type_dict:
         if type_dict[key] == 3:
             for key2 in type_dict:
                 if type_dict[key2] == 2:
                     return encode_hand_value((7, lookup.index(key), lookup.index(key2)))
-                
+
     #Check Flush
     if same_suit:
         return encode_hand_value((6, )
@@ -648,7 +648,7 @@ def max_hand(hand):
             break
     if is_high_straight:
         return encode_hand_value((5, highest_value))
-    elif is_low_straight:
+    if is_low_straight:
         # We use '3' here because if it is a low straight, A=1 and the highest value card
         # is 5 (A,2,3,4,5), which is 3 in the primary lookup list [2,3,4,5,...,A]
         return encode_hand_value((5, 3))
@@ -661,7 +661,7 @@ def max_hand(hand):
                     for key3 in type_dict:
                         if key3 != key and key3 != key2:
                             return encode_hand_value((4, lookup.index(key), lookup.index(key2), lookup.index(key3)))
-    
+
     #Check Two Pair
     num_pairs = 0
     for key in type_dict:
@@ -714,7 +714,7 @@ def best_hand(user_hand, table):
         raise ValueError("User hand must contain 2 cards")
     if len(table) > 5 or len(table) < 3:
         raise ValueError("Table must contain 3-5 cards")
-    
+
     #During the flop, the card combination is 5 choose 5, so one possible hand per-person
     #During the turn, the card combination is 6 choose 5, so 6 possible hands per-person
     #During the river, the card combination is 7 choose 5, so 21 possible hands per-person

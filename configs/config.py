@@ -1,4 +1,5 @@
-# Initialize important global variables
+"""Configs file that the bot will pull from.
+"""
 with open("configs/bot_token.txt", mode="r", encoding="utf-8") as token_file:
     global TOKEN
     TOKEN = token_file.read()
