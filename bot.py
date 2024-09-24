@@ -77,6 +77,12 @@ def create_commands(client):
         logging.info("Uno slash command used in channel [%i]", interaction.channel_id)
         await client.game_factory.start_game(interaction, game_type=3)
 
+    @client.tree.command(name="force-quit", 
+                         description="Forcibly quits the current active game in the channel")
+    async def force_quit(interaction: discord.Interaction):
+        logging.info("Force quit slash command used in channel [%i]", interaction.channel_id)
+        await client.game_factory.force_quit(interaction)
+
     @client.tree.command(name="getdebugdata", description="Get internal data for one or all games")
     @discord.app_commands.describe(
         channel_id=("The ID of the channel with an active game to get the"
