@@ -39,7 +39,7 @@ class UnoPlayer(BasePlayer):
         enabled.
         """
         playable_cards = [card for card in self.hand if card.name == top_card.name \
-            or card.value == top_card.value or card.name == "Wild"]
+            or card.value == top_card.value or card.name == "Wild" ]
         return playable_cards
 
 
@@ -98,19 +98,33 @@ class UnoManager(GameManager):
     '''
     def __init__(self, factory, channel):
         super().__init__(game=UnoGame(), base_gui=UnoButtonsBase(self),
-                         channel=channel, factory=factory)
+                         channel=channel, factory=factory, preferences_gui=UnoButtonsPreferences(self))
 
-    async def add_player(self, interaction, init_player_data=None):
+    async def add_player(self, interaction, init_player_data=UnoPlayer()):
         '''
         add_player: Called when a person presses the "Join" button.
         This method add the member to the game state's player_data as 
         well as adding their interaction.user to the turn_order.
         '''
+        #init_player_data = UnoPlayer()
         await super().add_player(interaction, init_player_data)
         if interaction.user in self.game.player_data \
         and interaction.user not in self.game.turn_order:
             self.game.turn_order.append(interaction.user)
 
+    async def preferences_menu(self, interaction):
+        """
+        This is the uno manager call for preferences menu
+        If the user that called for the preferences menu is currently in the game, send
+        an ephemeral message to the person who called for the preferences menu
+        a message which contains the submenu for selecting Uno Settings until
+        the user dismisses it or the game starts or ends, otherwise do nothing.
+        """
+        #TODO implement dismissing after game starts or ends
+        if interaction.user in self.game.player_data and interaction.user in self.game.turn_order:
+            await interaction.response.send_message(content=self.get_base_menu_string(),
+                                                    view=self.preferences_gui, silent=True, ephemeral=True, delete_after=2)
+            
     async def remove_player(self, interaction):
         '''
         remove_player: Called when a user presses the "Quit" button.
@@ -504,9 +518,19 @@ class UnoButtonsBase(discord.ui.View):
         # print when someone presses the button because otherwise
         # pylint won't shut up about button being unused
         self.manager.quick_log(f"{interaction.user} pressed {button.label}!")
+        await self.manager.add_player(interaction)
 
-        indi_player_data = UnoPlayer()
-        await self.manager.add_player(interaction, indi_player_data)
+    @discord.ui.button(label="Settings", style= discord.ButtonStyle.blurple)
+    async def settings(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        If the user that interacted with this menu is currently in the game, send
+        an ephemeral message to the person who interacted with this
+        menu a message which contains the submenu for selecting Uno Settings until
+        the user dismisses it or the game starts or ends, otherwise do nothing.
+        """
+        self.manager.quick_log(f"{interaction.user} pressed {button.label}")
+        await self.manager.preferences_menu(interaction)
+
 
     @discord.ui.button(label = "Quit", style = discord.ButtonStyle.red)
     async def quit(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -529,6 +553,26 @@ class UnoButtonsBase(discord.ui.View):
         self.manager.quick_log(f"{interaction.user} pressed {button.label}!")
         # start the game
         await self.manager.start_game(interaction)
+
+class UnoButtonsPreferences(discord.ui.View):
+    """
+    Provides the menu for adjusting uno settings on a per player basis
+    """
+    def __init__(self, manager):
+        super().__init__()
+        self.manager = manager
+
+    @discord.ui.button(label = "Placeholder button", style = discord.ButtonStyle.blurple)
+    async def start(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        A place holder button for use until the uno preferences menu has actual settings management implemented.
+        """
+        # print when someone presses the button because otherwise
+        # pylint won't shut up about button being unused
+        self.manager.quick_log(f"{interaction.user} pressed {button.label}!")
+        # start the game
+        #await self.manager.start_game(interaction)
+
 
 
 class UnoButtonsBaseGame(discord.ui.View):
@@ -727,7 +771,9 @@ class UnoCard(Card):
     """
     def __init__(self, name, value):
         super().__init__(name, value)
-
+        
+        #This code is likely no longer necessary, however until further testing is performed it may need to be reverted to
+        """
         self.priority = 0
         if self.name == "Red":
             self.priority += 0
@@ -755,6 +801,7 @@ class UnoCard(Card):
         elif self.value == "":
             self.priority += 0
         else: self.priority += int(self.value)
+        """
 
     def __str__(self):
         return f"{self.name} {self.value}"
@@ -769,7 +816,12 @@ class UnoCard(Card):
         return True
 
     def __lt__(self, other):
-        return self.priority < other.priority
+        if self.name != other.name:
+            return self.name < other.name
+        return self.value < other.value
 
     def __gt__(self, other):
-        return self.priority > other.priority
+        #return self.priority > other.priority
+        if self.name != other.name:
+            return self.name > other.name
+        return self.value > other.value
