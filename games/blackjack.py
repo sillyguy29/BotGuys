@@ -170,6 +170,7 @@ class BlackjackManager(GameManager):
         self.game.dealer_hidden_card = None
         self.game.turn_index = -1
         self.game.game_state = 1
+        self.game.betted_players = 0
         # allow players to join
         self.base_gui = BlackjackButtonsBase(self)
         await self.resend(interaction)

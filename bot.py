@@ -160,7 +160,7 @@ def run_bot(args):
     if len(args) >= 3:
         file_loglevel = args[2].lower().strip()
         if file_loglevel not in ("critical", "error", "warning", "info", "debug"):
-            print("Unknown logging level.")
+            print("Unknown file logging level.")
             return
         file_loglevel = get_loglevel(file_loglevel)
     else:
@@ -169,7 +169,7 @@ def run_bot(args):
     if len(args) >= 2:
         cmd_loglevel = args[1].lower().strip()
         if cmd_loglevel not in ("critical", "error", "warning", "info", "debug"):
-            print("Unknown logging level.")
+            print("Unknown cmd logging level.")
             return
         cmd_loglevel = get_loglevel(cmd_loglevel)
     else:
