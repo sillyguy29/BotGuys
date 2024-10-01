@@ -115,15 +115,17 @@ class UnoManager(GameManager):
     async def preferences_menu(self, interaction):
         """
         This is the uno manager call for preferences menu
-        If the user that called for the preferences menu is currently in the game, send
-        an ephemeral message to the person who called for the preferences menu
+        If the user that called for the preferences menu is currently in the game,
+        or does not already has a settings menu open and game has not started
+        send an ephemeral message to the person who called for the preferences menu
         a message which contains the submenu for selecting Uno Settings until
-        the user dismisses it or the game starts or ends, otherwise do nothing.
+        the user dismisses it or the game starts, otherwise do nothing.
         """
-        #TODO implement dismissing after game starts or ends
+        #TODO implement dismissing after game starts
+        #TODO implement actual settings menu
         if interaction.user in self.game.player_data and interaction.user in self.game.turn_order:
             await interaction.response.send_message(content=self.get_base_menu_string(),
-                                                    view=self.preferences_gui, silent=True, ephemeral=True, delete_after=2)
+                view=self.preferences_gui, silent=True, ephemeral=True, delete_after=2)
             
     async def remove_player(self, interaction):
         '''
