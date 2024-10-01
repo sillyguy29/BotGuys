@@ -2,8 +2,8 @@
 """
 import logging
 import datetime
+from games.blackjack.blackjack_manager import BlackjackManager
 from games.counter import CounterManager
-from games.blackjack import BlackjackManager
 from games.poker import PokerManager
 from games.uno import UnoManager
 from util import send_info_message
@@ -76,6 +76,17 @@ class GameFactory():
         """
         logging.info("[%i] Game stopping.", channel_id)
         self.active_games.pop(channel_id)
+
+
+    async def force_quit(self, interaction):
+        """
+        Forcibly quits a game
+        """
+        logging.info("[%i] Forcing game shutdown", interaction.channel_id)
+        await self.active_games[interaction.channel_id].quit_game(interaction)
+        # quit_game calls stop_game
+        await interaction.response.send_message("Game Stopped.", ephemeral=True, delete_after=10)
+
 
     async def get_debug_str(self, interaction, channel_id, print_type):
         """

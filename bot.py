@@ -77,6 +77,12 @@ def create_commands(client):
         logging.info("Uno slash command used in channel [%i]", interaction.channel_id)
         await client.game_factory.start_game(interaction, game_type=3)
 
+    @client.tree.command(name="force-quit",
+                         description="Forcibly quits the current active game in the channel")
+    async def force_quit(interaction: discord.Interaction):
+        logging.info("Force quit slash command used in channel [%i]", interaction.channel_id)
+        await client.game_factory.force_quit(interaction)
+
     @client.tree.command(name="getdebugdata", description="Get internal data for one or all games")
     @discord.app_commands.describe(
         channel_id=("The ID of the channel with an active game to get the"
@@ -154,7 +160,7 @@ def run_bot(args):
     if len(args) >= 3:
         file_loglevel = args[2].lower().strip()
         if file_loglevel not in ("critical", "error", "warning", "info", "debug"):
-            print("Unknown logging level.")
+            print("Unknown file logging level.")
             return
         file_loglevel = get_loglevel(file_loglevel)
     else:
@@ -163,7 +169,7 @@ def run_bot(args):
     if len(args) >= 2:
         cmd_loglevel = args[1].lower().strip()
         if cmd_loglevel not in ("critical", "error", "warning", "info", "debug"):
-            print("Unknown logging level.")
+            print("Unknown cmd logging level.")
             return
         cmd_loglevel = get_loglevel(cmd_loglevel)
     else:

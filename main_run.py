@@ -1,3 +1,6 @@
+"""
+Quick startup that bypasses command sync menu
+"""
 import sys
 from bot import create_commands, get_loglevel
 import discord
@@ -23,12 +26,11 @@ class LanternClient(discord.Client):
 
 
 if __name__ == "__main__":
-    
     args = sys.argv
     if len(args) >= 3:
         file_loglevel = args[2].lower().strip()
         if file_loglevel not in ("critical", "error", "warning", "info", "debug"):
-            print("Unknown logging level.")
+            print("Unknown file logging level.")
             sys.exit()
         file_loglevel = get_loglevel(file_loglevel)
     else:
@@ -37,7 +39,7 @@ if __name__ == "__main__":
     if len(args) >= 2:
         cmd_loglevel = args[1].lower().strip()
         if cmd_loglevel not in ("critical", "error", "warning", "info", "debug"):
-            print("Unknown logging level.")
+            print("Unknown cmd logging level.")
             sys.exit()
         cmd_loglevel = get_loglevel(cmd_loglevel)
     else:
