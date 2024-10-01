@@ -95,7 +95,7 @@ class GameManager():
     Methods can (and should) be overridden but be careful when doing so as to not
     break the default flow of all games
     """
-    def __init__(self, game, base_gui, channel, factory):
+    def __init__(self, game, base_gui, channel, factory, preferences_gui=None):
         # hold the game model that this manager needs to manage (pass constructor to
         # subclass of BaseGame for that game)
         self.game = game
@@ -109,6 +109,8 @@ class GameManager():
         # reference to the message that currently contains the base menu. Needed so that the
         # bot can remove the buttons from it or edit its contents at any time
         self.current_active_menu = None
+        # preferences menu layout
+        self.preferences_gui = preferences_gui
 
     async def create_game(self, interaction):
         """
@@ -153,6 +155,15 @@ class GameManager():
         self.current_active_menu = await self.channel.send(self.get_base_menu_string(),
                                                            view=self.base_gui, silent=True)
         self.quick_log("Base menu resent")
+    
+    async def preferences_menu(self, interaction):
+        """
+        This is the Game manager call for preferences menu
+        it should almost certainly not have been called.
+        """
+        self.quick_log("preferences_menu in GameManager called.")
+        await interaction.response.send_message(content="No preferences menu for this game.",
+            silent=True, ephemeral=True, delete_after=2)
 
     async def quit_game(self, interaction):
         """
