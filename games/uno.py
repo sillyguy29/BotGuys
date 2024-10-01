@@ -78,27 +78,15 @@ class UnoManager(GameManager):
     '''
     Uno game model class that controls the flow of Uno by interacting
     and modifying its UnoGame property and updating its base GUI to
-    receive input from the players. A brief overview of its methods:
-    1. add_player: adds player to the game
-    2. remove_player: removes player from the game
-    3. start_game: proceeds to game setup
-    4. get_base_menu_string: gets current game message
-    5. start_new_round: return to "player join" phase
-    6. setup: Sets up the table and players' hands
-    7. draw_cards: Gives player cards from the deck
-    8. regenerate_deck: Replenishes the deck when its empty
-    9. get_player_hand: Handy getter of a player's hand
-    10. update_turn_index: Increment or decrement turn index
-    11. get_next_turn_index: Tells what the current turn index is
-    12. play_card: Handles events of playing a card
-    13. next_turn: Update turn index, skipping 'skipped' players
-    14. announce: Gives each player important information
-    15. card_to_emoji: Returns emoji of a card (colon-flanked-text)
-    16. color_to_emoji: Returns emoji of a card (actual-emoji)
+    receive input from the players.
     '''
     def __init__(self, factory, channel):
-        super().__init__(game=UnoGame(), base_gui=UnoButtonsBase(self),
-                         channel=channel, factory=factory, preferences_gui=UnoButtonsPreferences(self))
+        super().__init__(
+            game=UnoGame(),
+            base_gui=UnoButtonsBase(self),
+            channel=channel, factory=factory,
+            preferences_gui=UnoButtonsPreferences(self)
+        )
 
     async def add_player(self, interaction, init_player_data=UnoPlayer()):
         '''
@@ -123,10 +111,17 @@ class UnoManager(GameManager):
         """
         #TODO implement dismissing after game starts
         #TODO implement actual settings menu
-        if interaction.user in self.game.player_data and interaction.user in self.game.turn_order:
-            await interaction.response.send_message(content=self.get_base_menu_string(),
-                view=self.preferences_gui, silent=True, ephemeral=True, delete_after=2)
-            
+        if  self.game.game_state != 4 and \
+            interaction.user in self.game.player_data and \
+            interaction.user in self.game.turn_order:
+            await interaction.response.send_message(
+                content="",
+                view=self.preferences_gui,
+                silent=True,
+                ephemeral=True,
+                delete_after=60
+            )
+
     async def remove_player(self, interaction):
         '''
         remove_player: Called when a user presses the "Quit" button.
@@ -567,13 +562,26 @@ class UnoButtonsPreferences(discord.ui.View):
     @discord.ui.button(label = "Placeholder button", style = discord.ButtonStyle.blurple)
     async def start(self, interaction: discord.Interaction, button: discord.ui.Button):
         """
-        A place holder button for use until the uno preferences menu has actual settings management implemented.
+        A place holder button for use until the uno preferences menu has actual
+        settings management implemented.
         """
         # print when someone presses the button because otherwise
         # pylint won't shut up about button being unused
         self.manager.quick_log(f"{interaction.user} pressed {button.label}!")
         # start the game
         #await self.manager.start_game(interaction)
+
+    @discord.ui.button(label = "Exit Settings", style = discord.ButtonStyle.red)
+    async def exit(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        A place holder button for use until the uno preferences menu has actual
+        settings management implemented.
+        """
+        # print when someone presses the button because otherwise
+        # pylint won't shut up about button being unused
+        self.manager.quick_log(f"{interaction.user} pressed {button.label}!")
+        # start the game
+        await self.manager.close_preferences_menu(interaction)
 
 
 
@@ -771,39 +779,6 @@ class UnoCard(Card):
     This class represents an Uno card. On construction, it uses its
     name and value to establish a priority, used for sorting in a list.
     """
-    def __init__(self, name, value):
-        super().__init__(name, value)
-        
-        #This code is likely no longer necessary, however until further testing is performed it may need to be reverted to
-        """
-        self.priority = 0
-        if self.name == "Red":
-            self.priority += 0
-        if self.name == "Blue":
-            self.priority += 15
-        if self.name == "Green":
-            self.priority += 30
-        if self.name == "Yellow":
-            self.priority += 45
-        if self.name == "Wild":
-            self.priority += 60
-
-        if self.value == "Reverse":
-            self.priority += 11
-        elif self.value == "Skip":
-            self.priority += 12
-        elif self.value == "Draw Two":
-            self.priority += 13
-        elif self.value == "Card":
-            self.priority += 1
-        elif self.value == "Draw Four":
-            self.priority += 2
-        elif self.value == "Wild":
-            self.priority += 0
-        elif self.value == "":
-            self.priority += 0
-        else: self.priority += int(self.value)
-        """
 
     def __str__(self):
         return f"{self.name} {self.value}"

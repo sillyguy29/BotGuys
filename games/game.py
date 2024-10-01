@@ -155,15 +155,23 @@ class GameManager():
         self.current_active_menu = await self.channel.send(self.get_base_menu_string(),
                                                            view=self.base_gui, silent=True)
         self.quick_log("Base menu resent")
-    
+
     async def preferences_menu(self, interaction):
         """
         This is the Game manager call for preferences menu
         it should almost certainly not have been called.
         """
-        self.quick_log("preferences_menu in GameManager called.")
+        self.quick_log(f"brought up preferences menu for {interaction.user}")
         await interaction.response.send_message(content="No preferences menu for this game.",
             silent=True, ephemeral=True, delete_after=2)
+
+    async def close_preferences_menu(self, interaction):
+        """
+        This method will close the preferences menu currently shown to the user,
+        it should only be called from the preferences menu's quit button.
+        """
+        self.quick_log(f"removing preferences menu for {interaction.user}")
+        await interaction.message.delete()
 
     async def quit_game(self, interaction):
         """
