@@ -2,8 +2,8 @@
 """
 import logging
 import datetime
+from games.blackjack.blackjack_manager import BlackjackManager
 from games.counter import CounterManager
-from games.blackjack import BlackjackManager
 from games.poker import PokerManager
 from games.uno import UnoManager
 from util import send_info_message
