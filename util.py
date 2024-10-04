@@ -165,3 +165,11 @@ async def send_info_message(content, interaction):
     logging.debug("[%i] User [%s] sent info message with content [%s]",
                   interaction.channel_id, interaction.user.name, content)
     await interaction.response.send_message(content=content, ephemeral=True, delete_after=10)
+
+async def disable_menu(view):
+    """
+    Disables the buttons on a view.
+    """
+    for item in view.children:
+        if type(item) == discord.ui.Button:
+            item.disabled = True

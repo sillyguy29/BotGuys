@@ -4,6 +4,7 @@ Contains all views for blackjack
 import discord
 from util import send_info_message
 
+
 class QuitGameButton(discord.ui.View):
     """
     Button set that asks players if they want to play the game again
@@ -49,11 +50,7 @@ class BlackjackButtonsBase(discord.ui.View):
     @discord.ui.button(label = "Join", style = discord.ButtonStyle.green)
     async def join(self, interaction: discord.Interaction, button: discord.ui.Button):
         """
-        Send an ephemeral message to the person who interacted with
-        this button that contains the hit or miss menu. This menu
-        will be deleted after it is interacted with or 60 seconds
-        has passed (prevents menus that are not accounted for after
-        game end).
+        Lets the player join the game
         """
         # print when someone presses the button because otherwise
         # pylint won't shut up about button being unused

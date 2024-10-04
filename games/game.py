@@ -87,7 +87,6 @@ class BaseGame():
         f"\tgame_state: {self.game_state}\n"
         f"\tmax_players: {self.max_players}\n")
 
-
 class GameManager():
     """
     Manages the most basic interactions for any game, such as creation, base menu
@@ -155,7 +154,7 @@ class GameManager():
         self.current_active_menu = await self.channel.send(self.get_base_menu_string(),
                                                            view=self.base_gui, silent=True)
         self.quick_log("Base menu resent")
-    
+
     async def preferences_menu(self, interaction):
         """
         This is the Game manager call for preferences menu
