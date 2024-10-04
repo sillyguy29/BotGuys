@@ -72,7 +72,16 @@ class UnoGame(BaseGame):
         self.turn_index = 0
         self.reversed = False
         self.top_card = UnoCard("None", "")
-
+        #preferences variables
+        self.drawn_card_show_time = 5
+        self.make_deck_time = 0
+        self.can_stack_effect_cards_on_effect_cards = True
+        self.can_stack_plus_fours_on_effect_cards = True
+        self.can_stack_effect_cards_on_plus_fours = True
+        self.can_stack_plus_fours_on_plus_fours = True
+        self.reverse_card_repeats_players_turn = False
+        self.can_callout_uno = False
+        self.only_play_plus_fours_without_matching_color = False
 
 class UnoManager(GameManager):
     '''

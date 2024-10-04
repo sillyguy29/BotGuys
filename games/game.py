@@ -171,7 +171,7 @@ class GameManager():
         it should only be called from the preferences menu's quit button.
         """
         self.quick_log(f"removing preferences menu for {interaction.user}")
-        await interaction.message.delete()
+        await interaction.response.edit_message(content="Cancelled", view=None, delete_after=0)
 
     async def quit_game(self, interaction):
         """
