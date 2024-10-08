@@ -13,11 +13,14 @@ from util import Card
 
 #TODO split views into separate file
 #TODO implement getters and setters for preferences, possibly some sort of name and type association system for preferences
+#TODO implement dynamic preferences menu generation
 #TODO separate view for users who can affect it maybe
 #TODO implement dismissing preferences menu after game starts
 #TODO implement actual settings menu
 #TODO implement preferences behavior
 #TODO disable preferences button after game start
+#TODO show settings in join message
+#TODO single instance of preferences_gui view may cause issues with dynamic preference adding.
 
 class UnoPlayer(BasePlayer):
     """
@@ -79,6 +82,43 @@ class UnoGame(BaseGame):
         self.reversed = False
         self.top_card = UnoCard("None", "")
         #preferences variables
+        self.preferences = {
+            "Drawn card show time": {"type": "number", "value": 5, "min": 0, "max": 20},
+            "Make deck time":       {"type": "number", "value": 0, "min": 0, "max": 20},
+            "Stacking allowances":  {
+                "type": "select", 
+                "value": [
+                    "can_stack_effect_cards_on_effect_cards",
+                    "can_stack_plus_fours_on_effect_cards",
+                    "can_stack_effect_cards_on_plus_fours",
+                    "can_stack_plus_fours_on_plus_fours"
+                ],
+                "options": [
+                    {
+                        "value": "can_stack_effect_cards_on_effect_cards", 
+                        "label": "Can stack effect cards on other effect cards"
+                    },
+                    {
+                        "value": "can_stack_plus_fours_on_effect_cards",
+                        "label": "Can stack plus fours on effect cards"
+                    },
+                    {
+                        "value": "can_stack_effect_cards_on_plus_fours",
+                        "label": "Can stack effect cards on plus fours"
+                    },
+                    {
+                        "value": "can_stack_plus_fours_on_plus_fours",
+                        "label": "Can stack plus fours on other plus fours"
+                    }
+                ],
+                "min_selected": 0,
+                "max_selected": 4
+            },
+            "Reverse card repeats players turn":              {"type" : "boolean", "value": False},
+            "Can callout Uno":                                {"type" : "boolean", "value": False},
+            "Can only play plus fours without matching color":{"type" : "boolean", "value": False},
+        }
+        """
         self.drawn_card_show_time = 5
         self.make_deck_time = 0
         self.can_stack_effect_cards_on_effect_cards = True
@@ -88,6 +128,7 @@ class UnoGame(BaseGame):
         self.reverse_card_repeats_players_turn = False
         self.can_callout_uno = False
         self.only_play_plus_fours_without_matching_color = False
+        """
 
 class UnoManager(GameManager):
     '''
@@ -116,6 +157,33 @@ class UnoManager(GameManager):
         and interaction.user not in self.game.turn_order:
             self.game.turn_order.append(interaction.user)
 
+    def add_menu_items(self, view):
+        """
+        Adds the ui elements needed to change the preferences of a managers game to a view
+        """
+        for key,value in self.game.preferences.items():
+            if value["type"] == "number":
+                pass
+            elif value["type"] == "select":
+                view.add_item(discord.ui.Select(
+                    min_values = value["min_selected"],
+                    max_values = value["max_selected"],
+                    options = [
+                        discord.SelectOption(
+                            label = x["label"],
+                            value = x["value"],
+                            default = x["value"] in value["value"]
+                        )
+                        for x in value["options"]
+                    ]
+                    #list comprehension for turning all options listed in
+                    #preferences options into selectionOption items
+                ))
+            elif value["type"] == "boolean":
+                pass
+            else:
+                raise ValueError("Invalid preference type in game")
+
     async def preferences_menu(self, interaction):
         """
         This is the uno manager call for preferences menu
@@ -130,6 +198,7 @@ class UnoManager(GameManager):
             interaction.user in self.game.player_data and \
             interaction.user in self.game.turn_order and \
             interaction.user.id == self.game.user_id:
+            self.add_menu_items(self.preferences_gui)
             await interaction.response.send_message(
                 content="",
                 view=self.preferences_gui,
