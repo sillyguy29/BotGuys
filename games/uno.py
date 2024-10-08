@@ -11,7 +11,13 @@ from games.game import GameManager
 from games.game import BasePlayer
 from util import Card
 
-
+#TODO split views into separate file
+#TODO implement getters and setters for preferences, possibly some sort of name and type association system for preferences
+#TODO separate view for users who can affect it maybe
+#TODO implement dismissing preferences menu after game starts
+#TODO implement actual settings menu
+#TODO implement preferences behavior
+#TODO disable preferences button after game start
 
 class UnoPlayer(BasePlayer):
     """
@@ -62,9 +68,9 @@ class UnoGame(BaseGame):
            the middle of the table that the players need to match
            color or value.
     """
-    def __init__(self):
+    def __init__(self, user_id):
         # game state 1 -> accepting players but not playing yet
-        super().__init__(game_type=3, player_data={}, game_state=1)
+        super().__init__(game_type=3, player_data={}, game_state=1, user_id=user_id)
 
         self.deck = []
         self.discard = []
@@ -89,11 +95,12 @@ class UnoManager(GameManager):
     and modifying its UnoGame property and updating its base GUI to
     receive input from the players.
     '''
-    def __init__(self, factory, channel):
+    def __init__(self, factory, channel, user_id=None):
         super().__init__(
-            game=UnoGame(),
+            game=UnoGame(user_id),
             base_gui=UnoButtonsBase(self),
-            channel=channel, factory=factory,
+            channel=channel,
+            factory=factory,
             preferences_gui=UnoButtonsPreferences(self)
         )
 
@@ -112,17 +119,17 @@ class UnoManager(GameManager):
     async def preferences_menu(self, interaction):
         """
         This is the uno manager call for preferences menu
-        If the user that called for the preferences menu is currently in the game,
-        or does not already has a settings menu open and game has not started
+        If the user that called for the preferences menu is the one who called the
+        uno command and is currently in the game and game has not started
         send an ephemeral message to the person who called for the preferences menu
-        a message which contains the submenu for selecting Uno Settings until
-        the user dismisses it or the game starts, otherwise do nothing.
+        which contains the submenu for selecting Uno Settings. Otherwise send a failure
+        message mentioning one of these requirements. The preferences menu will stay until
+        the user dismisses it or the game starts.
         """
-        #TODO implement dismissing after game starts
-        #TODO implement actual settings menu
         if  self.game.game_state != 4 and \
             interaction.user in self.game.player_data and \
-            interaction.user in self.game.turn_order:
+            interaction.user in self.game.turn_order and \
+            interaction.user.id == self.game.user_id:
             await interaction.response.send_message(
                 content="",
                 view=self.preferences_gui,
@@ -130,6 +137,28 @@ class UnoManager(GameManager):
                 ephemeral=True,
                 delete_after=60
             )
+        elif interaction.user.id != self.game.user_id:
+            await interaction.response.send_message(
+                content="You are not the creator of this game.",
+                silent=True,
+                ephemeral=True,
+                delete_after=5
+            )
+        elif interaction.user not in self.game.player_data:
+            await interaction.response.send_message(
+                content="You have not yet joined the game.",
+                silent=True,
+                ephemeral=True,
+                delete_after=5
+            )
+        elif interaction.user in self.game.turn_order:
+            await interaction.response.send_message(
+                content="You have not yet joined the game.",
+                silent=True,
+                ephemeral=True,
+                delete_after=5
+            )
+
 
     async def remove_player(self, interaction):
         '''
@@ -536,7 +565,6 @@ class UnoButtonsBase(discord.ui.View):
         """
         self.manager.quick_log(f"{interaction.user} pressed {button.label}")
         await self.manager.preferences_menu(interaction)
-
 
     @discord.ui.button(label = "Quit", style = discord.ButtonStyle.red)
     async def quit(self, interaction: discord.Interaction, button: discord.ui.Button):
