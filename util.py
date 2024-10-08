@@ -166,10 +166,32 @@ async def send_info_message(content, interaction):
                   interaction.channel_id, interaction.user.name, content)
     await interaction.response.send_message(content=content, ephemeral=True, delete_after=10)
 
-async def disable_menu(view):
+async def get_disabled_view(view):
     """
-    Disables the buttons on a view.
+    Returns a version of the view with all buttons disabled, and attaches that menu to
+    the main menu object so it can be performed faster the next time this happens
     """
+    if view.disabled_view is not None:
+        return view.disabled_view
+
+    # Look through the existing view for buttons and add
+    # identical versions of those buttons to a list
+    children = []
     for item in view.children:
         if type(item) == discord.ui.Button:
-            item.disabled = True
+            new_button = discord.ui.Button(label = item.label,
+                                           disabled = True,
+                                           emoji = item.emoji,
+                                           style = item.style,
+                                           url = item.url)
+            children.append(new_button)
+
+    # Create a new view with the disabled buttons
+    disabled_view = discord.ui.View(timeout = 0)
+    for item in children:
+        disabled_view.add_item(item)
+    
+    # Add this new view to the old view so we don't
+    # have to do this again in the future, and return
+    view.disabled_view = disabled_view
+    return disabled_view

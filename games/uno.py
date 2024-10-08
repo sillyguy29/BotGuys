@@ -507,6 +507,7 @@ class UnoButtonsBase(discord.ui.View):
     def __init__(self, manager):
         super().__init__()
         self.manager = manager
+        self.disabled_view = None
 
     @discord.ui.button(label = "Join", style = discord.ButtonStyle.green)
     async def join(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -563,6 +564,7 @@ class UnoButtonsPreferences(discord.ui.View):
     def __init__(self, manager):
         super().__init__()
         self.manager = manager
+        self.disabled_view = None
 
     @discord.ui.button(label = "Placeholder button", style = discord.ButtonStyle.blurple)
     async def start(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -585,6 +587,7 @@ class UnoButtonsBaseGame(discord.ui.View):
     def __init__(self, manager):
         super().__init__()
         self.manager = manager
+        self.disabled_view = None
 
     @discord.ui.button(label = "Show Hand", style = discord.ButtonStyle.green)
     async def show_cards(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -657,6 +660,7 @@ class UnoCardButtons(discord.ui.View):
         super().__init__()
         self.manager = manager
         self.player_hand = self.manager.get_player_hand(player)
+        self.disabled_view = None
 
         for card in self.player_hand:
             current_turn_player = self.manager.game.turn_order[self.manager.game.turn_index]
@@ -694,6 +698,7 @@ class UnoWildCard(discord.ui.View):
     def __init__(self, manager):
         super().__init__()
         self.manager = manager
+        self.disabled_view = None
 
     @discord.ui.button(label = "Red", style = discord.ButtonStyle.gray, emoji = "🔴")
     async def red(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -739,6 +744,7 @@ class QuitGameButton(discord.ui.View):
     def __init__(self, manager):
         super().__init__()
         self.manager = manager
+        self.disabled_view = None
 
     @discord.ui.button(label = "Go Again!", style = discord.ButtonStyle.green)
     async def restart(self, interaction: discord.Interaction, button: discord.ui.Button):

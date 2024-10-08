@@ -73,6 +73,7 @@ class HitOrMiss(discord.ui.View):
     def __init__(self, manager):
         super().__init__()
         self.manager = manager
+        self.disabled_view = None
 
     @discord.ui.button(label = "Hit Me!", style = discord.ButtonStyle.green)
     async def hit_me(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -106,6 +107,7 @@ class CounterButtonsBase(discord.ui.View):
     def __init__(self, manager):
         super().__init__()
         self.manager = manager
+        self.disabled_view = None
 
     @discord.ui.button(label = "Hit or Miss", style = discord.ButtonStyle.green)
     async def hit_miss(self, interaction: discord.Interaction, button: discord.ui.Button):

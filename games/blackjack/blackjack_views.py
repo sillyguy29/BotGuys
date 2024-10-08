@@ -12,6 +12,7 @@ class QuitGameButton(discord.ui.View):
     def __init__(self, manager):
         super().__init__()
         self.manager = manager
+        self.disabled_view = None
 
     @discord.ui.button(label = "Go Again!", style = discord.ButtonStyle.green)
     async def restart(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -46,6 +47,7 @@ class BlackjackButtonsBase(discord.ui.View):
     def __init__(self, manager):
         super().__init__()
         self.manager = manager
+        self.disabled_view = None
 
     @discord.ui.button(label = "Join", style = discord.ButtonStyle.green)
     async def join(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -88,6 +90,7 @@ class BlackjackButtonsBaseGame(discord.ui.View):
     def __init__(self, manager):
         super().__init__()
         self.manager = manager
+        self.disabled_view = None
 
     @discord.ui.button(label = "Resend", style = discord.ButtonStyle.gray)
     async def resend(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -137,6 +140,7 @@ class ButtonsBetPhase(discord.ui.View):
     def __init__(self, manager):
         super().__init__()
         self.manager = manager
+        self.disabled_view = None
 
     @discord.ui.button(label = "Bet!", style = discord.ButtonStyle.green)
     async def bet(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -159,6 +163,7 @@ class HitOrStand(discord.ui.View):
         super().__init__()
         self.manager = manager
         self.active_player = active_player
+        self.disabled_view = None
 
     @discord.ui.button(label = "Hit Me!", style = discord.ButtonStyle.green)
     async def hit_me(self, interaction: discord.Interaction, button: discord.ui.Button):

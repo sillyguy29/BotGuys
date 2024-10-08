@@ -360,6 +360,7 @@ class PokerButtonsBase(discord.ui.View):
     def __init__(self, manager):
         super().__init__()
         self.manager = manager
+        self.disabled_view = None
 
     @discord.ui.button(label = "Join", style = discord.ButtonStyle.green)
     async def join(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -407,6 +408,7 @@ class PokerButtonsBaseGame(discord.ui.View):
     def __init__(self, manager):
         super().__init__()
         self.manager = manager
+        self.disabled_view = None
 
     @discord.ui.button(label = "Resend", style = discord.ButtonStyle.gray)
     async def start(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -454,6 +456,7 @@ class ButtonsBetPhase(discord.ui.View):
     def __init__(self, manager):
         super().__init__()
         self.manager = manager
+        self.disabled_view = None
 
     async def next_player(self, interaction: discord.Interaction, folded):
         """
@@ -534,6 +537,7 @@ class QuitGameButton(discord.ui.View):
     def __init__(self, manager):
         super().__init__()
         self.manager = manager
+        self.disabled_view = None
 
     @discord.ui.button(label = "Go Again!", style = discord.ButtonStyle.green)
     async def restart(self, interaction: discord.Interaction, button: discord.ui.Button):
