@@ -83,6 +83,12 @@ def create_commands(client):
         logging.info("Force quit slash command used in channel [%i]", interaction.channel_id)
         await client.game_factory.force_quit(interaction)
 
+    @client.tree.command(name="test-modal",
+                         description="Brings up a testing modal")
+    async def test_modal(interaction: discord.Interaction):
+        logging.info("Test modal slash command used in channel [%i]", interaction.channel_id)
+        await interaction.response.send_modal(TestModal())
+
     @client.tree.command(name="getdebugdata", description="Get internal data for one or all games")
     @discord.app_commands.describe(
         channel_id=("The ID of the channel with an active game to get the"
@@ -151,6 +157,24 @@ def get_loglevel(level_str):
         return logging.INFO
     elif level_str == "debug":
         return logging.DEBUG
+
+
+class TestModal(discord.ui.Modal):
+    """
+    Modal for testing buttons & stuff
+    """
+    def __init__(self):
+        super().__init__(title="Bet")
+
+    bet_box = discord.ui.TextInput(label="What's your favorite number?",
+                                   max_length=10,
+                                   placeholder="Enter number here...")
+
+    async def on_submit(self, interaction: discord.Interaction):
+        """
+        Overriden method that activates when the user submits the form.
+        """
+        await interaction.response.send_message(self.bet_box)
 
 
 def run_bot(args):
