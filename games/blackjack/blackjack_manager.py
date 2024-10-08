@@ -98,25 +98,16 @@ class BlackjackManager(GameManager):
             self.game.dealer_hidden_card = None
             self.game.dealer_hand.append(hidden_card)
 
-        # TODO: resend doesn't support sending only based on channel.
-        # current solution is to just reimplement its logic here,
-        # pls improve
-        if  self.game.game_state == -1:
-            return
-        await self.current_active_menu.edit(view=None)
+        await self.interactionless_resend(use_gui=False)
         # if dealer's hidden card is None, that means we added it to
         # its hand because it got blackjack
         if self.game.dealer_hidden_card is None:
-            self.current_active_menu = await self.channel.send(self.get_base_menu_string(),
-                                                               view=None, silent=True)
             self.channel.send("Dealer got blackjack! House wins!")
             # move straight to payout phase
             self.make_payout(21)
         else:
             # otherwise initiate play phase
             self.base_gui = Views.BlackjackButtonsBaseGame(self)
-            self.current_active_menu = await self.channel.send(self.get_base_menu_string(),
-                                                               view=self.base_gui, silent=True)
             await self.start_next_player_turn()
 
     async def start_next_player_turn(self):

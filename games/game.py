@@ -6,7 +6,7 @@ players joining/leaving, ending the game, etc
 """
 import logging
 import discord
-from util import send_info_message
+from util import send_info_message, get_disabled_view
 
 class BasePlayer():
     """
@@ -87,7 +87,6 @@ class BaseGame():
         f"\tgame_state: {self.game_state}\n"
         f"\tmax_players: {self.max_players}\n")
 
-
 class GameManager():
     """
     Manages the most basic interactions for any game, such as creation, base menu
@@ -101,6 +100,8 @@ class GameManager():
         self.game = game
         # default button layout that the bot can use to construct the base menu at any time
         self.base_gui = base_gui
+        # disabled version of the base GUI that the bot can access when needed
+        self.base_gui_disabled = None
         # ID of the channel that this game is taking place in
         self.channel = channel
         # reference to the GameFactory class, needed to remove the game from the active games
@@ -125,6 +126,8 @@ class GameManager():
         # set our base menu message to the message that the interaction (ie the slash command
         # that started the game) was responded with (the base menu created by this interaction)
         self.current_active_menu = await interaction.original_response()
+        # also make sure to get the disabled version of the base GUI befor it gets changed
+        self.base_gui_disabled = await get_disabled_view(self.base_gui)
 
     async def refresh(self, interaction):
         """
@@ -139,7 +142,7 @@ class GameManager():
                                             view=self.base_gui)
         self.quick_log("Base menu refreshed")
 
-    async def resend(self, interaction):
+    async def resend(self, interaction, use_gui=True):
         """
         Remove the buttons from the current active base menu and send a new one
         """
@@ -148,13 +151,47 @@ class GameManager():
         if await self.game_end_check(interaction):
             return
 
-        # removes the view (which contains the buttons) from the current active base menu
-        await self.current_active_menu.edit(view=None)
+        # changes the view to the disabled version
+        await self.current_active_menu.edit(view=self.base_gui_disabled)
         # InteractionMessage inherits from Message so we can access the channel attribute to
         # send a new base menu into
-        self.current_active_menu = await self.channel.send(self.get_base_menu_string(),
-                                                           view=self.base_gui, silent=True)
+        if use_gui == True:
+            self.current_active_menu = await self.channel.send(self.get_base_menu_string(),
+                                                               view=self.base_gui, silent=True)
+            # Get the disabled version of the current gui (could potentially do nothing)
+            self.base_gui_disabled = await get_disabled_view(self.base_gui)
+        else:
+            self.current_active_menu = await self.channel.send(self.get_base_menu_string(),
+                                                               view=None, silent=True)
+            # We don't want to add in a menu to this message later
+            self.base_gui_disabled = None
         self.quick_log("Base menu resent")
+
+    async def interactionless_resend(self, use_gui=True):
+        """
+        Works the same as resend but if it can't be triggered by an interaction
+        """
+        self.quick_log("Resending base menu")
+        # check to make sure the game hasn't ended, do nothing if it has
+        if self.game.has_ended():
+            return
+
+        # changes the view to the disabled version
+        await self.current_active_menu.edit(view=self.base_gui_disabled)
+        # InteractionMessage inherits from Message so we can access the channel attribute to
+        # send a new base menu into
+        if use_gui == True:
+            self.current_active_menu = await self.channel.send(self.get_base_menu_string(),
+                                                               view=self.base_gui, silent=True)
+            # Get the disabled version of the current gui (could potentially do nothing)
+            self.base_gui_disabled = await get_disabled_view(self.base_gui)
+        else:
+            self.current_active_menu = await self.channel.send(self.get_base_menu_string(),
+                                                               view=None, silent=True)
+            # We don't want to add in a menu to this message later
+            self.base_gui_disabled = None
+        self.quick_log("Base menu resent")
+
 
     async def preferences_menu(self, interaction):
         """
