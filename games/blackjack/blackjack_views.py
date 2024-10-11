@@ -10,7 +10,7 @@ class QuitGameButton(discord.ui.View):
     Button set that asks players if they want to play the game again
     """
     def __init__(self, manager):
-        super().__init__()
+        super().__init__(timeout=None)
         self.manager = manager
         self.disabled_view = None
 
@@ -45,7 +45,7 @@ class BlackjackButtonsBase(discord.ui.View):
     Initial "join game" buttons
     """
     def __init__(self, manager):
-        super().__init__()
+        super().__init__(timeout=None)
         self.manager = manager
         self.disabled_view = None
 
@@ -88,7 +88,7 @@ class BlackjackButtonsBaseGame(discord.ui.View):
     Literally just a resend button
     """
     def __init__(self, manager):
-        super().__init__()
+        super().__init__(timeout=None)
         self.manager = manager
         self.disabled_view = None
 
@@ -138,7 +138,7 @@ class ButtonsBetPhase(discord.ui.View):
     placed bets
     """
     def __init__(self, manager):
-        super().__init__()
+        super().__init__(timeout=None)
         self.manager = manager
         self.disabled_view = None
 
@@ -160,7 +160,7 @@ class HitOrStand(discord.ui.View):
     to other players
     """
     def __init__(self, manager, active_player):
-        super().__init__()
+        super().__init__(timeout=None)
         self.manager = manager
         self.active_player = active_player
         self.disabled_view = None

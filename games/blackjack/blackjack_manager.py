@@ -3,6 +3,11 @@
 Contains all the logic needed to run a game of Blackjack.
 It features an closed game model, meaning not all users can interact
 with the game at any time, and there is player management.
+GAME STATE BREAKDOWN:
+4 -> Betting phase
+5 -> Card dealing phase
+6 -> Dealer's draw
+7 -> Game is over (players asked if they want to play again)
 """
 import discord
 import games.blackjack.blackjack_game as Game
@@ -27,6 +32,7 @@ class BlackjackManager(GameManager):
         if interaction.user in self.game.player_data \
         and interaction.user not in self.game.turn_order:
             self.game.turn_order.append(interaction.user)
+            await self.refresh(interaction)
 
     async def remove_player(self, interaction):
         await super().remove_player(interaction)
@@ -36,6 +42,7 @@ class BlackjackManager(GameManager):
         # if nobody else is left, then quit the game
         if self.game.players == 0:
             await self.quit_game(interaction)
+            
 
     async def start_game(self, interaction):
         """
@@ -150,7 +157,10 @@ class BlackjackManager(GameManager):
 
     def get_base_menu_string(self):
         if self.game.game_state == 1:
-            return "Who's ready for a game of blackjack?"
+            ret = "Who's ready for a game of blackjack?\nCurrent Players:"
+            for player in self.game.turn_order:
+                ret = ret + f"\n\t{player.display_name}"
+            return ret
 
         if self.game.game_state == 4:
             ret = "Current bets and chips:\n"

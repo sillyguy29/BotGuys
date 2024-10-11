@@ -3,6 +3,12 @@
 Defines abstract classes for the model and manager which are used to
 control basic things that exist for all game types, such as starting,
 players joining/leaving, ending the game, etc
+GAME STATES BREAKDOWN:
+-1 -> Game is over
+0 -> Game is open to anyone at any time
+1 -> Players can join and leave
+2 -> Players can join but not leave
+3 -> Players can leave but not join
 """
 import logging
 import discord
@@ -112,6 +118,7 @@ class GameManager():
         self.current_active_menu = None
         # preferences menu layout
         self.preferences_gui = preferences_gui
+        self.base_gui_by_game_state = dict()
 
     async def create_game(self, interaction):
         """
@@ -153,14 +160,14 @@ class GameManager():
 
         # changes the view to the disabled version
         await self.current_active_menu.edit(view=self.base_gui_disabled)
-        # InteractionMessage inherits from Message so we can access the channel attribute to
-        # send a new base menu into
-        if use_gui == True:
+        if use_gui is True:
+            # Send with a GUI
             self.current_active_menu = await self.channel.send(self.get_base_menu_string(),
                                                                view=self.base_gui, silent=True)
             # Get the disabled version of the current gui (could potentially do nothing)
             self.base_gui_disabled = await get_disabled_view(self.base_gui)
         else:
+            # Send with no GUI
             self.current_active_menu = await self.channel.send(self.get_base_menu_string(),
                                                                view=None, silent=True)
             # We don't want to add in a menu to this message later
@@ -178,14 +185,14 @@ class GameManager():
 
         # changes the view to the disabled version
         await self.current_active_menu.edit(view=self.base_gui_disabled)
-        # InteractionMessage inherits from Message so we can access the channel attribute to
-        # send a new base menu into
-        if use_gui == True:
+        if use_gui is True:
+            # Send with a GUI
             self.current_active_menu = await self.channel.send(self.get_base_menu_string(),
                                                                view=self.base_gui, silent=True)
             # Get the disabled version of the current gui (could potentially do nothing)
             self.base_gui_disabled = await get_disabled_view(self.base_gui)
         else:
+            # Send with no GUI
             self.current_active_menu = await self.channel.send(self.get_base_menu_string(),
                                                                view=None, silent=True)
             # We don't want to add in a menu to this message later
