@@ -171,6 +171,10 @@ async def get_disabled_view(view):
     Returns a version of the view with all buttons disabled, and attaches that menu to
     the main menu object so it can be performed faster the next time this happens
     """
+    # skip if there isn't supposed to be a GUI here
+    if view is None:
+        return None
+
     if view.disabled_view is not None:
         return view.disabled_view
 

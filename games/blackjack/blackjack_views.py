@@ -165,6 +165,12 @@ class HitOrStand(discord.ui.View):
         self.active_player = active_player
         self.disabled_view = None
 
+    def set_player(self, player):
+        """
+        Updates the player that this view looks for
+        """
+        self.active_player = player
+
     @discord.ui.button(label = "Hit Me!", style = discord.ButtonStyle.green)
     async def hit_me(self, interaction: discord.Interaction, button: discord.ui.Button):
         """

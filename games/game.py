@@ -100,14 +100,10 @@ class GameManager():
     Methods can (and should) be overridden but be careful when doing so as to not
     break the default flow of all games
     """
-    def __init__(self, game, base_gui, channel, factory, preferences_gui=None):
+    def __init__(self, game, channel, factory, preferences_gui=None, gui_by_game_state=None):
         # hold the game model that this manager needs to manage (pass constructor to
         # subclass of BaseGame for that game)
         self.game = game
-        # default button layout that the bot can use to construct the base menu at any time
-        self.base_gui = base_gui
-        # disabled version of the base GUI that the bot can access when needed
-        self.base_gui_disabled = None
         # ID of the channel that this game is taking place in
         self.channel = channel
         # reference to the GameFactory class, needed to remove the game from the active games
@@ -118,7 +114,7 @@ class GameManager():
         self.current_active_menu = None
         # preferences menu layout
         self.preferences_gui = preferences_gui
-        self.base_gui_by_game_state = dict()
+        self.gui_by_game_state = gui_by_game_state
 
     async def create_game(self, interaction):
         """
@@ -129,12 +125,24 @@ class GameManager():
         # construct the first base menu message, grabbing the buttons from self.base_gui
         # and the message contents from self.get_base_menu_string
         await interaction.response.send_message(content=self.get_base_menu_string(),
-                                                view=self.base_gui, silent=True)
+                                                view=self.gui_by_game_state[self.game.game_state],
+                                                silent=True)
         # set our base menu message to the message that the interaction (ie the slash command
         # that started the game) was responded with (the base menu created by this interaction)
         self.current_active_menu = await interaction.original_response()
-        # also make sure to get the disabled version of the base GUI befor it gets changed
-        self.base_gui_disabled = await get_disabled_view(self.base_gui)
+
+    async def progress_game(self, old_state, new_state):
+        """
+        Disables old menu and progresses the game to the new_state. This does
+        not progress the game state on its own, that should be done manually
+        beforehand.
+        """
+        # disable the old menu
+        await self.current_active_menu.edit(view=await get_disabled_view(
+                                                       self.gui_by_game_state[old_state]))
+
+        self.current_active_menu = await self.channel.send(content=self.get_base_menu_string(),
+                                                           view=self.gui_by_game_state[new_state])
 
     async def refresh(self, interaction):
         """
@@ -146,7 +154,7 @@ class GameManager():
             return
 
         await self.current_active_menu.edit(content=self.get_base_menu_string(),
-                                            view=self.base_gui)
+                                            view=self.gui_by_game_state[self.game.game_state])
         self.quick_log("Base menu refreshed")
 
     async def resend(self, interaction, use_gui=True):
@@ -159,19 +167,19 @@ class GameManager():
             return
 
         # changes the view to the disabled version
-        await self.current_active_menu.edit(view=self.base_gui_disabled)
+        await self.current_active_menu.edit(view=await get_disabled_view(
+                                            self.gui_by_game_state[self.game.game_state]))
         if use_gui is True:
             # Send with a GUI
-            self.current_active_menu = await self.channel.send(self.get_base_menu_string(),
-                                                               view=self.base_gui, silent=True)
-            # Get the disabled version of the current gui (could potentially do nothing)
-            self.base_gui_disabled = await get_disabled_view(self.base_gui)
+            self.current_active_menu = await self.channel.send(
+                                             self.get_base_menu_string(),
+                                             view=self.gui_by_game_state[self.game.game_state],
+                                             silent=True)
         else:
             # Send with no GUI
             self.current_active_menu = await self.channel.send(self.get_base_menu_string(),
                                                                view=None, silent=True)
-            # We don't want to add in a menu to this message later
-            self.base_gui_disabled = None
+
         self.quick_log("Base menu resent")
 
     async def interactionless_resend(self, use_gui=True):
@@ -184,19 +192,18 @@ class GameManager():
             return
 
         # changes the view to the disabled version
-        await self.current_active_menu.edit(view=self.base_gui_disabled)
+        await self.current_active_menu.edit(view=await get_disabled_view(
+                                            self.gui_by_game_state[self.game.game_state]))
         if use_gui is True:
             # Send with a GUI
-            self.current_active_menu = await self.channel.send(self.get_base_menu_string(),
-                                                               view=self.base_gui, silent=True)
-            # Get the disabled version of the current gui (could potentially do nothing)
-            self.base_gui_disabled = await get_disabled_view(self.base_gui)
+            self.current_active_menu = await self.channel.send(
+                                             self.get_base_menu_string(),
+                                             view=self.gui_by_game_state[self.game.game_state],
+                                             silent=True)
         else:
             # Send with no GUI
             self.current_active_menu = await self.channel.send(self.get_base_menu_string(),
                                                                view=None, silent=True)
-            # We don't want to add in a menu to this message later
-            self.base_gui_disabled = None
         self.quick_log("Base menu resent")
 
     async def preferences_menu(self, interaction):
