@@ -21,6 +21,7 @@ from util import Card
 #TODO disable preferences button after game start
 #TODO show settings in join message
 #TODO single instance of preferences_gui view may cause issues with dynamic preference adding.
+#TODO setup rows for preferences menu to fix annoying ui element ordering
 
 class UnoPlayer(BasePlayer):
     """
@@ -163,9 +164,51 @@ class UnoManager(GameManager):
         """
         for key,value in self.game.preferences.items():
             if value["type"] == "number":
-                pass
+                generated_button = discord.ui.Button(
+                    label=f"{key} is {value['value']}"
+                )
+                generated_modal = discord.ui.Modal(
+                    title=key
+                )
+                generated_modal.add_item(discord.ui.TextInput(
+                    label=key,
+                    placeholder="Enter a number...",
+                    default=str(value["value"]),
+                    min_length=len(str(value["min"])),
+                    max_length=len(str(value["max"]))
+                ))
+                async def set_value_from_modal(
+                    interaction, modal_in_question=generated_modal,
+                    value=value["value"]
+                    ):
+                    value = int(modal_in_question.children[0].value)
+                    modal_in_question.stop()
+                    await interaction.response.send_message(
+                        content="Response",
+                        silent=True,
+                        ephemeral=True,
+                        delete_after=0
+                    )
+                async def interaction_check_for_modal(
+                    interaction,
+                    modal_in_question=generated_modal
+                    ):
+                    try:
+                        int(modal_in_question.children[0].value)
+                    except ValueError:
+                        return False
+                    return True
+                generated_modal.interaction_check = interaction_check_for_modal
+                generated_modal.on_submit = set_value_from_modal
+                async def bring_up_modal(
+                    interaction,
+                    modal_to_use=generated_modal
+                    ):
+                    await interaction.response.send_modal(modal_to_use)
+                generated_button.callback = bring_up_modal
+                view.add_item(generated_button)
             elif value["type"] == "select":
-                view.add_item(discord.ui.Select(
+                generated_select_menu = discord.ui.Select(
                     min_values = value["min_selected"],
                     max_values = value["max_selected"],
                     options = [
@@ -178,9 +221,31 @@ class UnoManager(GameManager):
                     ]
                     #list comprehension for turning all options listed in
                     #preferences options into selectionOption items
-                ))
+                )
+                #generated_select_menu.callback = lambda interaction: interaction.
+                # response.send_message()
+                view.add_item(generated_select_menu)
             elif value["type"] == "boolean":
-                pass
+                #Similar to the select type but specifically for boolean values.
+                #The naming could be better then just shoving the key name into
+                #the label but it would require specifying it in the preferences dict.
+                generated_boolean_menu = discord.ui.Select(
+                    min_values = 1,
+                    max_values = 1,
+                    options = [
+                        discord.SelectOption(
+                            label = f"{key} Enabled",
+                            value = "True",
+                            default = value["value"]
+                        ),
+                        discord.SelectOption(
+                            label = f"{key} Disabled",
+                            value = "False",
+                            default = not value["value"]
+                        )
+                    ]
+                )
+                view.add_item(generated_boolean_menu)
             else:
                 raise ValueError("Invalid preference type in game")
 
@@ -690,8 +755,6 @@ class UnoButtonsPreferences(discord.ui.View):
         self.manager.quick_log(f"{interaction.user} pressed {button.label}!")
         # start the game
         await self.manager.close_preferences_menu(interaction)
-
-
 
 class UnoButtonsBaseGame(discord.ui.View):
     """
