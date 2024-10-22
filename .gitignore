@@ -165,3 +165,6 @@ guild_id.txt
 
 # ignore logs
 logs/
+
+# ignore feedback
+feedback/
