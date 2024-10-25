@@ -131,11 +131,26 @@ class GameManager():
         # that started the game) was responded with (the base menu created by this interaction)
         self.current_active_menu = await interaction.original_response()
 
+    async def invalidate_menu(self, state):
+        """
+        Replaces an old active menu with its disabled version, as long as the state arg
+        matches with the game state that the menu is for
+        """
+        await self.current_active_menu.edit(view=await get_disabled_view(
+                                                       self.gui_by_game_state[state]))
+
+    async def new_menu(self, state):
+        """
+        Sends a new message with a the menu corresponding with the game state provided
+        by the state arg
+        """
+        self.current_active_menu = await self.channel.send(content=self.get_base_menu_string(),
+                                                           view=self.gui_by_game_state[state],
+                                                           silent=True)
+
     async def progress_game(self, old_state, new_state):
         """
-        Disables old menu and progresses the game to the new_state. This does
-        not progress the game state on its own, that should be done manually
-        beforehand.
+        Runs both invalidate_menu and new_menu (may want to deprecate later)
         """
         # disable the old menu
         await self.current_active_menu.edit(view=await get_disabled_view(

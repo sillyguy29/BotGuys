@@ -27,7 +27,7 @@ class BlackjackManager(GameManager):
     def __init__(self, factory, channel):
         gui_by_game_state = {0: None, 1: Views.BlackjackButtonsBase(self), 2: None, 3: None,
                              4: Views.ButtonsBetPhase(self),
-                             5: None,
+                             5: None, 6:None,
                              7: Views.QuitGameButton(self)}
         super().__init__(game=Game.BlackjackGame(), channel=channel, factory=factory,
                          gui_by_game_state=gui_by_game_state)
@@ -61,7 +61,8 @@ class BlackjackManager(GameManager):
         # game_state == 4 -> players cannot join or leave
         self.game.game_state = 4
         await interaction.response.send_message(f"{interaction.user.mention} started the game!")
-        await self.progress_game(1, 4)
+        await self.invalidate_menu(1)
+        await self.new_menu(4)
         return
         # swap default GUI to betting phase buttons
         await interaction.channel.send(f"{interaction.user.display_name} started the game!")
@@ -80,7 +81,8 @@ class BlackjackManager(GameManager):
         self.game.game_state = 1
         self.game.betted_players = 0
         await interaction.response.send_message(f"{interaction.user.mention} started a new game!")
-        await self.progress_game(7, 1)
+        await self.invalidate_menu(7)
+        await self.new_menu(1)
         return
         # allow players to join
         self.base_gui = Views.BlackjackButtonsBase(self)
@@ -93,6 +95,7 @@ class BlackjackManager(GameManager):
         # make sure we're at the end of the betting phase
         if self.game.game_state != 4:
             return
+        await self.invalidate_menu(4)
         # game_state 5 -> dealing phase (players cannot join or leave)
         self.game.game_state = 5
 
@@ -116,7 +119,6 @@ class BlackjackManager(GameManager):
             self.game.dealer_hidden_card = None
             self.game.dealer_hand.append(hidden_card)
 
-        await self.progress_game(4, 5)
         # if dealer's hidden card is None, that means we added it to
         # its hand because it got blackjack
         if self.game.dealer_hidden_card is None:
@@ -141,7 +143,7 @@ class BlackjackManager(GameManager):
             await self.dealer_draw()
             return
 
-        await self.interactionless_resend(use_gui=False)
+        await self.new_menu(0)
 
         # retrieving data
         active_player = self.game.get_active_player()
