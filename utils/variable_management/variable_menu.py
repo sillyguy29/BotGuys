@@ -24,49 +24,7 @@ class VariableMenu:
         it into the view index it was assigned to
         """
         if value["type"] == "number":
-            button=self.menu_view.children[value["index"]]
-            button.label=f"{key} is {value['value']}"
-            generated_modal = discord.ui.Modal(
-                title=key
-            )
-            generated_modal.add_item(discord.ui.TextInput(
-                label=key,
-                placeholder="Enter a number...",
-                default=str(value["value"]),
-                min_length=len(str(value["min"])),
-                max_length=len(str(value["max"]))
-            ))
-            async def set_value_from_modal(
-                interaction, modal_in_question=generated_modal,
-                key=key
-                ):
-                self.game.preferences[key]["value"] = int(modal_in_question.children[0].value)
-                self.generate_menu_item_contents(key, self.game.preferences[key])
-                modal_in_question.stop()
-                await interaction.response.edit_message(view=self.menu_view)
-            async def interaction_check_for_modal(
-                interaction,
-                modal_in_question=generated_modal,
-                key=key
-                ):
-                try:
-                    val = int(modal_in_question.children[0].value)
-                    if not (
-                        self.game.preferences[key]["min"] < val and
-                        self.game.preferences[key]["max"] > val
-                        ):
-                        return False
-                except ValueError:
-                    return False
-                return True
-            generated_modal.interaction_check = interaction_check_for_modal
-            generated_modal.on_submit = set_value_from_modal
-            async def bring_up_modal(
-                interaction,
-                modal_to_use=generated_modal
-                ):
-                await interaction.response.send_modal(modal_to_use)
-            button.callback = bring_up_modal
+            pass
         elif value["type"] == "select":
             select_menu = self.menu_view.children[value["index"]]
             select_menu.min_values = value["min_selected"]
