@@ -18,11 +18,8 @@ from utils.variable_management.variable_storage import VariableStorage
 from utils.variable_management.variable_menu import VariableMenu
 
 #TODO split views into separate file
-#TODO implement getters and setters for preferences, possibly some sort of name and type association system for preferences
-#TODO implement dynamic preferences menu generation
 #TODO separate view for users who can affect it maybe
 #TODO implement dismissing preferences menu after game starts
-#TODO implement actual settings menu
 #TODO implement preferences behavior
 #TODO disable preferences button after game start
 #TODO show settings in join message
@@ -88,11 +85,31 @@ class UnoGame(BaseGame):
         self.turn_index = 0
         self.reversed = False
         self.top_card = UnoCard("None", "")
-        #preferences variables
-        self.preferences = [
+        """
+        self.drawn_card_show_time = 5
+        self.make_deck_time = 0
+        self.can_stack_effect_cards_on_effect_cards = True
+        self.can_stack_plus_fours_on_effect_cards = True
+        self.can_stack_effect_cards_on_plus_fours = True
+        self.can_stack_plus_fours_on_plus_fours = True
+        self.reverse_card_repeats_players_turn = False
+        self.can_callout_uno = False
+        self.only_play_plus_fours_without_matching_color = False
+        """
+
+class UnoManager(GameManager):
+    '''
+    Uno game model class that controls the flow of Uno by interacting
+    and modifying its UnoGame property and updating its base GUI to
+    receive input from the players.
+    '''
+    def __init__(self, factory, channel, user_id=None):
+        #defines the variables for use and display
+        preferences = [
             IntegerVariable("Drawn card show time", 5, range_min=0, range_max=20),
             IntegerVariable("Make deck time", 0, range_min=0, range_max=20),
-            OptionVariable("Stacking allowances",
+            OptionVariable(
+                name="Stacking allowances",
                 default_value=[
                     "can_stack_effect_cards_on_effect_cards",
                     "can_stack_plus_fours_on_effect_cards",
@@ -124,61 +141,7 @@ class UnoGame(BaseGame):
             BooleanVariable("Can callout Uno",False),
             BooleanVariable("Can only play plus fours without matching color",False)
         ]
-        """
-        self.drawn_card_show_time = 5
-        self.make_deck_time = 0
-        self.can_stack_effect_cards_on_effect_cards = True
-        self.can_stack_plus_fours_on_effect_cards = True
-        self.can_stack_effect_cards_on_plus_fours = True
-        self.can_stack_plus_fours_on_plus_fours = True
-        self.reverse_card_repeats_players_turn = False
-        self.can_callout_uno = False
-        self.only_play_plus_fours_without_matching_color = False
-        """
-
-class UnoManager(GameManager):
-    '''
-    Uno game model class that controls the flow of Uno by interacting
-    and modifying its UnoGame property and updating its base GUI to
-    receive input from the players.
-    '''
-    def __init__(self, factory, channel, user_id=None):
-        #defines the variables for use and display
-        self.preferences_variables = VariableStorage([
-            IntegerVariable("Drawn card show time", 5, range_min=0, range_max=20),
-            IntegerVariable("Make deck time", 0, range_min=0, range_max=20),
-            OptionVariable("Stacking allowances",
-                default_value=[
-                    "can_stack_effect_cards_on_effect_cards",
-                    "can_stack_plus_fours_on_effect_cards",
-                    "can_stack_effect_cards_on_plus_fours",
-                    "can_stack_plus_fours_on_plus_fours"
-                ],
-                options=[
-                    OptionRepresentation(
-                        "Can stack effect cards on other effect cards",
-                        "can_stack_effect_cards_on_effect_cards"
-                    ),
-                    OptionRepresentation(
-                        "Can stack plus fours on effect cards",
-                        "can_stack_plus_fours_on_effect_cards"
-                    ),
-                    OptionRepresentation(
-                        "Can stack effect cards on plus fours",
-                        "can_stack_effect_cards_on_plus_fours"
-                    ),
-                    OptionRepresentation(
-                        "Can stack plus fours on other plus fours",
-                        "can_stack_plus_fours_on_plus_fours"
-                    )
-                ],
-                min_selected=0,
-                max_selected=4
-            ),
-            BooleanVariable("Reverse card repeats players turn",False),
-            BooleanVariable("Can callout Uno",False),
-            BooleanVariable("Can only play plus fours without matching color",False)
-        ])
+        self.preferences_variables = VariableStorage(preferences)
         super().__init__(
             game=UnoGame(user_id),
             base_gui=UnoButtonsBase(self),
@@ -189,14 +152,14 @@ class UnoManager(GameManager):
         #prepares view for usage
         preferences_quit_button = discord.ui.Button(
             style=discord.ButtonStyle.red,
-            label="Quit",
+            label="Exit Settings",
         )
         async def quit_button_callback(interaction):
             self.quick_log(f"{interaction.user} pressed {preferences_quit_button.label}!")
             # start the game
             await self.close_preferences_menu(interaction)
         preferences_quit_button.callback = quit_button_callback
-        self.preferences_menu.add_item(preferences_quit_button)
+        self.preferences_menu.add_ui_element(preferences_quit_button)
         self.preferences_menu.add_menu_items()
 
     async def add_player(self, interaction, init_player_data=UnoPlayer()):

@@ -13,15 +13,21 @@ class VariableStorage:
 
     def get_value_of(self,name):
         """
-        Getter method for accessing a variable in the storage by its name
+        Getter method for accessing the value of a variable in the storage by its name
         """
-        return self.variables[name].getValue()
+        return self.variables[name].get_value()
 
     def set_value_of(self,name, value):
         """
-        Setter method for setting a variable in the storage by its name
+        Setter method for setting the value of avariable in the storage by its name
         """
-        self.variables[name].setValue(value)
+        self.variables[name].set_value(value)
+    
+    def get_variable(self, name):
+        """
+        Getter method for directly accessing a variable in storage by its name
+        """
+        return self.variables[name]
 
     def get_variable_names(self):
         """

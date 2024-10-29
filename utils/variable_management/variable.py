@@ -20,8 +20,8 @@ class IntegerVariable(Variable):
     def __init__(self, name, default_value=0, range_min=0, range_max=None):
         super().__init__(name)
         self.value = int(default_value)
-        self.range_min = 0
-        self.range_max = 0
+        self.range_min = range_min
+        self.range_max = range_max
 
     def set_value(self,value):
         """
@@ -97,7 +97,7 @@ class OptionRepresentation():
     should be presented as and what the internal representation is.
     """
     def __init__(self, presentation_string, internal_value):
-        self.presentation_string = presentation_string,
+        self.presentation_string = presentation_string
         self.internal_value = internal_value
 
 class OptionVariable(Variable):
@@ -184,9 +184,7 @@ class BooleanVariable(OptionVariable):
         super().__init__(
             name,
             default_value=[
-                OptionRepresentation("Enabled", True)
-                if default_value else
-                OptionRepresentation("Disabled", False)
+                default_value
             ],
             options=[
                 OptionRepresentation("Enabled", True),
