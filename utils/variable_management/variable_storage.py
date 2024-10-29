@@ -7,8 +7,9 @@ class VariableStorage:
     Class for interfacing with a set of variables as referenced by their name
     """
     def __init__(self, variables=None):
-        if variables is None:
-            self.variables = {}
+        self.variables = {}
+        for variable in variables:
+            self.variables[variable.name] = variable
 
     def get_value_of(self,name):
         """

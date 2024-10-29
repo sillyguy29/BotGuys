@@ -9,14 +9,33 @@ class VariableMenu:
     Class for creating and managing a menu that interfaces with a particular variable storage
     object.
     """
-    def __init__(self, variable_storage):
+    def __init__(self, variable_storage, variable_order=None):
         self.variable_storage = variable_storage
-        self.variable_layout = {
-            key: {"order": index, "index": None}
-            for index, key in
-            enumerate(self.variable_storage.get_variable_names())
-        } #TIL dict comprhensions are a thing, truly python is the most glorious of languages
+        if variable_order is None:
+            self.variable_layout = {
+                key: {"order": index, "index": None}
+                for index, key in
+                enumerate(self.variable_storage.get_variable_names())
+            } #TIL dict comprehensions are a thing, truly python is the most glorious of languages
+        else:
+            self.variable_layout = {
+                key: {"order": index, "index": None}
+                for index, key in
+                enumerate(variable_order)
+            }
         self.menu_view = discord.ui.View()
+
+    def get_view(self):
+        """
+        Returns the view for displaying and editing variables.
+        """
+        return self.menu_view
+
+    def add_ui_element(self, element):
+        """
+        Manually add a ui element, useful in the case where you want a button to do something that
+        is not just modifying the value of a variable.
+        """
 
     def create_menu_item(self, key):
         """
@@ -36,7 +55,9 @@ class VariableMenu:
 
     def add_menu_items(self):
         """
-        Adds the ui elements needed to change the preferences of a managers game to a view
+        Prepares a variable menu view for display by
+        adding the ui elements needed to edit the variables in variable storage
+        and then generating their contents.
         """
         ordered_by_layout = [
             x[0]

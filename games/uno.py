@@ -10,6 +10,12 @@ from games.game import BaseGame
 from games.game import GameManager
 from games.game import BasePlayer
 from util import Card
+from utils.variable_management.variable import IntegerVariable
+from utils.variable_management.variable import OptionVariable
+from utils.variable_management.variable import BooleanVariable
+from utils.variable_management.variable import OptionRepresentation
+from utils.variable_management.variable_storage import VariableStorage
+from utils.variable_management.variable_menu import VariableMenu
 
 #TODO split views into separate file
 #TODO implement getters and setters for preferences, possibly some sort of name and type association system for preferences
@@ -83,42 +89,41 @@ class UnoGame(BaseGame):
         self.reversed = False
         self.top_card = UnoCard("None", "")
         #preferences variables
-        self.preferences = {
-            "Drawn card show time": {"type": "number", "value": 5, "min": 0, "max": 20},
-            "Make deck time":       {"type": "number", "value": 0, "min": 0, "max": 20},
-            "Stacking allowances":  {
-                "type": "select", 
-                "value": [
+        self.preferences = [
+            IntegerVariable("Drawn card show time", 5, range_min=0, range_max=20),
+            IntegerVariable("Make deck time", 0, range_min=0, range_max=20),
+            OptionVariable("Stacking allowances",
+                default_value=[
                     "can_stack_effect_cards_on_effect_cards",
                     "can_stack_plus_fours_on_effect_cards",
                     "can_stack_effect_cards_on_plus_fours",
                     "can_stack_plus_fours_on_plus_fours"
                 ],
-                "options": [
-                    {
-                        "value": "can_stack_effect_cards_on_effect_cards", 
-                        "label": "Can stack effect cards on other effect cards"
-                    },
-                    {
-                        "value": "can_stack_plus_fours_on_effect_cards",
-                        "label": "Can stack plus fours on effect cards"
-                    },
-                    {
-                        "value": "can_stack_effect_cards_on_plus_fours",
-                        "label": "Can stack effect cards on plus fours"
-                    },
-                    {
-                        "value": "can_stack_plus_fours_on_plus_fours",
-                        "label": "Can stack plus fours on other plus fours"
-                    }
+                options=[
+                    OptionRepresentation(
+                        "Can stack effect cards on other effect cards",
+                        "can_stack_effect_cards_on_effect_cards"
+                    ),
+                    OptionRepresentation(
+                        "Can stack plus fours on effect cards",
+                        "can_stack_plus_fours_on_effect_cards"
+                    ),
+                    OptionRepresentation(
+                        "Can stack effect cards on plus fours",
+                        "can_stack_effect_cards_on_plus_fours"
+                    ),
+                    OptionRepresentation(
+                        "Can stack plus fours on other plus fours",
+                        "can_stack_plus_fours_on_plus_fours"
+                    )
                 ],
-                "min_selected": 0,
-                "max_selected": 4
-            },
-            "Reverse card repeats players turn":              {"type" : "boolean", "value": False},
-            "Can callout Uno":                                {"type" : "boolean", "value": False},
-            "Can only play plus fours without matching color":{"type" : "boolean", "value": False},
-        }
+                min_selected=0,
+                max_selected=4
+            ),
+            BooleanVariable("Reverse card repeats players turn",False),
+            BooleanVariable("Can callout Uno",False),
+            BooleanVariable("Can only play plus fours without matching color",False)
+        ]
         """
         self.drawn_card_show_time = 5
         self.make_deck_time = 0
@@ -138,14 +143,61 @@ class UnoManager(GameManager):
     receive input from the players.
     '''
     def __init__(self, factory, channel, user_id=None):
+        #defines the variables for use and display
+        self.preferences_variables = VariableStorage([
+            IntegerVariable("Drawn card show time", 5, range_min=0, range_max=20),
+            IntegerVariable("Make deck time", 0, range_min=0, range_max=20),
+            OptionVariable("Stacking allowances",
+                default_value=[
+                    "can_stack_effect_cards_on_effect_cards",
+                    "can_stack_plus_fours_on_effect_cards",
+                    "can_stack_effect_cards_on_plus_fours",
+                    "can_stack_plus_fours_on_plus_fours"
+                ],
+                options=[
+                    OptionRepresentation(
+                        "Can stack effect cards on other effect cards",
+                        "can_stack_effect_cards_on_effect_cards"
+                    ),
+                    OptionRepresentation(
+                        "Can stack plus fours on effect cards",
+                        "can_stack_plus_fours_on_effect_cards"
+                    ),
+                    OptionRepresentation(
+                        "Can stack effect cards on plus fours",
+                        "can_stack_effect_cards_on_plus_fours"
+                    ),
+                    OptionRepresentation(
+                        "Can stack plus fours on other plus fours",
+                        "can_stack_plus_fours_on_plus_fours"
+                    )
+                ],
+                min_selected=0,
+                max_selected=4
+            ),
+            BooleanVariable("Reverse card repeats players turn",False),
+            BooleanVariable("Can callout Uno",False),
+            BooleanVariable("Can only play plus fours without matching color",False)
+        ])
         super().__init__(
             game=UnoGame(user_id),
             base_gui=UnoButtonsBase(self),
             channel=channel,
             factory=factory,
-            preferences_gui=UnoButtonsPreferences(self)
+            preferences_menu=VariableMenu(self.preferences_variables)
         )
-        self.add_menu_items()
+        #prepares view for usage
+        preferences_quit_button = discord.ui.Button(
+            style=discord.ButtonStyle.red,
+            label="Quit",
+        )
+        async def quit_button_callback(interaction):
+            self.quick_log(f"{interaction.user} pressed {preferences_quit_button.label}!")
+            # start the game
+            await self.close_preferences_menu(interaction)
+        preferences_quit_button.callback = quit_button_callback
+        self.preferences_menu.add_item(preferences_quit_button)
+        self.preferences_menu.add_menu_items()
 
     async def add_player(self, interaction, init_player_data=UnoPlayer()):
         '''
@@ -159,171 +211,7 @@ class UnoManager(GameManager):
         and interaction.user not in self.game.turn_order:
             self.game.turn_order.append(interaction.user)
 
-    def create_menu_item(self, key, value):
-        """
-        adds a placeholder menu item without contents and determines
-        that items position within the view for future use
-        """
-        value["index"]=len(self.preferences_gui.children)
-        self.quick_log(f"{key} {value['index']}")
-        if value["type"] == "number":
-            generated_button = discord.ui.Button(label="Placeholder")
-            #generated_modal = discord.ui.Modal(title="Placeholder")
-            #generated_modal.add_item(discord.ui.TextInput(label="Placeholder"))
-            #value["model"]=generated_modal
-            self.preferences_gui.add_item(generated_button)
-        elif value["type"] == "select":
-            #select menus need at least 1 SelectOptions otherwise they will not be valid
-            #when sent through the discord api
-            generated_select_menu = discord.ui.Select(
-                options=[
-                    discord.SelectOption(label="Placeholder")
-                ]
-            )
-            self.preferences_gui.add_item(generated_select_menu)
-        elif value["type"] == "boolean":
-            #Similar to the select type but specifically for boolean values.
-            #The naming could be better then just shoving the key name into
-            #the label but it would require specifying it in the preferences dict.
-            generated_boolean_menu = discord.ui.Select(
-                options=[
-                    discord.SelectOption(label="Placeholder")
-                ]
-            )
-            self.preferences_gui.add_item(generated_boolean_menu)
-        else:
-            raise ValueError("Invalid preference type in game")
-
-    def generate_menu_item_contents(self, key, value):
-        """
-        generates the menu ui element for a given variable in preferences and inserts
-        it into the view index it was assigned to
-        """
-        self.quick_log(f"{key} {value['index']}")
-        if value["type"] == "number":
-            #self.quick_log("adding number")
-            #self.quick_log("had " + str(self.preferences_gui.children[value["index"]]))
-            button=self.preferences_gui.children[value["index"]]
-            button.label=f"{key} is {value['value']}"
-            generated_modal = discord.ui.Modal(
-                title=key
-            )
-            generated_modal.add_item(discord.ui.TextInput(
-                label=key,
-                placeholder="Enter a number...",
-                default=str(value["value"]),
-                min_length=len(str(value["min"])),
-                max_length=len(str(value["max"]))
-            ))
-            async def set_value_from_modal(
-                interaction, modal_in_question=generated_modal,
-                key=key
-                ):
-                self.quick_log(f"{interaction.user} set value for {modal_in_question.title}")
-                self.game.preferences[key]["value"] = int(modal_in_question.children[0].value)
-                self.generate_menu_item_contents(key, self.game.preferences[key])
-                modal_in_question.stop()
-                await interaction.response.edit_message(view=self.preferences_gui)
-            async def interaction_check_for_modal(
-                interaction,
-                modal_in_question=generated_modal,
-                key=key
-                ):
-                self.quick_log(f"{interaction.user} interaction check for {modal_in_question.title}")
-                try:
-                    val = int(modal_in_question.children[0].value)
-                    if not (
-                        self.game.preferences[key]["min"] < val and
-                        self.game.preferences[key]["max"] > val
-                        ):
-                        return False
-                except ValueError:
-                    return False
-                return True
-            generated_modal.interaction_check = interaction_check_for_modal
-            generated_modal.on_submit = set_value_from_modal
-            async def bring_up_modal(
-                interaction,
-                modal_to_use=generated_modal
-                ):
-                await interaction.response.send_modal(modal_to_use)
-            button.callback = bring_up_modal
-            #self.quick_log("replaced with " + str(self.preferences_gui.children[value["index"]]))
-        elif value["type"] == "select":
-            self.quick_log("adding select")
-            select_menu = self.preferences_gui.children[value["index"]]
-            select_menu.min_values = value["min_selected"]
-            select_menu.max_values = value["max_selected"]
-            select_menu.options = [
-                discord.SelectOption(
-                    label = x["label"],
-                    value = x["value"],
-                    default = x["value"] in value["value"]
-                )
-                for x in value["options"]
-            ]
-            async def set_value_from_select_menu(
-                interaction,
-                menu_in_question=select_menu,
-                key=key
-                ):
-                self.game.preferences[key]["value"]=menu_in_question.values
-                await interaction.response.send_message(
-                    "response",
-                    silent=True,
-                    ephemeral=True,
-                    delete_after=0
-                )
-            select_menu.callback = set_value_from_select_menu
-            self.preferences_gui.children[value["index"]]=select_menu
-        elif value["type"] == "boolean":
-            #self.quick_log("adding boolean")
-            #Similar to the select type but specifically for boolean values.
-            #The naming could be better then just shoving the key name into
-            #the label but it would require specifying it in the preferences dict.
-            boolean_menu = self.preferences_gui.children[value["index"]]
-            boolean_menu.min_values = 1
-            boolean_menu.max_values = 1
-            boolean_menu.options = [
-                discord.SelectOption(
-                    label = f"{key} Enabled",
-                    value = "True",
-                    default = value["value"]
-                ),
-                discord.SelectOption(
-                    label = f"{key} Disabled",
-                    value = "False",
-                    default = not value["value"]
-                )
-            ]
-            async def set_value_from_select_menu(
-                interaction,
-                menu_in_question=boolean_menu,
-                key=key
-                ):
-                self.game.preferences[key]["value"]=menu_in_question.values == "True"
-                await interaction.response.send_message(
-                    "response",
-                    silent=True,
-                    ephemeral=True,
-                    delete_after=0
-                )
-            boolean_menu.callback = set_value_from_select_menu
-        else:
-            raise ValueError("Invalid preference type in game")
-
-    def add_menu_items(self):
-        """
-        Adds the ui elements needed to change the preferences of a managers game to a view
-        """
-        for key,value in self.game.preferences.items():
-            self.create_menu_item(key, value)
-            self.quick_log(f"created as {self.preferences_gui.children[-1]}")
-        
-        for key,value in self.game.preferences.items():
-            self.generate_menu_item_contents(key, value)
-
-    async def preferences_menu(self, interaction):
+    async def bring_up_preferences_menu(self, interaction):
         """
         This is the uno manager call for preferences menu
         If the user that called for the preferences menu is the one who called the
@@ -339,7 +227,7 @@ class UnoManager(GameManager):
             interaction.user.id == self.game.user_id:
             await interaction.response.send_message(
                 content="",
-                view=self.preferences_gui,
+                view=self.preferences_menu.get_view(),
                 silent=True,
                 ephemeral=True,
                 delete_after=60
@@ -365,7 +253,6 @@ class UnoManager(GameManager):
                 ephemeral=True,
                 delete_after=5
             )
-
 
     async def remove_player(self, interaction):
         '''
@@ -772,7 +659,7 @@ class UnoButtonsBase(discord.ui.View):
         the user dismisses it or the game starts or ends, otherwise do nothing.
         """
         self.manager.quick_log(f"{interaction.user} pressed {button.label}")
-        await self.manager.preferences_menu(interaction)
+        await self.manager.bring_up_preferences_menu(interaction)
 
     @discord.ui.button(label = "Quit", style = discord.ButtonStyle.red)
     async def quit(self, interaction: discord.Interaction, button: discord.ui.Button):
