@@ -1,6 +1,14 @@
+"""
+Contains the class for creating and managing a menu that interfaces with a particular variable
+storage object.
+"""
 import discord
 
 class VariableMenu:
+    """
+    Class for creating and managing a menu that interfaces with a particular variable storage
+    object.
+    """
     def __init__(self, variable_storage):
         self.variable_storage = variable_storage
         self.variable_layout = {
@@ -23,68 +31,8 @@ class VariableMenu:
         generates the menu ui element for a given variable in preferences and inserts
         it into the view index it was assigned to
         """
-        if value["type"] == "number":
-            pass
-        elif value["type"] == "select":
-            select_menu = self.menu_view.children[value["index"]]
-            select_menu.min_values = value["min_selected"]
-            select_menu.max_values = value["max_selected"]
-            select_menu.options = [
-                discord.SelectOption(
-                    label = x["label"],
-                    value = x["value"],
-                    default = x["value"] in value["value"]
-                )
-                for x in value["options"]
-            ]
-            async def set_value_from_select_menu(
-                interaction,
-                menu_in_question=select_menu,
-                key=key
-                ):
-                self.game.preferences[key]["value"]=menu_in_question.values
-                await interaction.response.send_message(
-                    "response",
-                    silent=True,
-                    ephemeral=True,
-                    delete_after=0
-                )
-            select_menu.callback = set_value_from_select_menu
-            self.menu_view.children[value["index"]]=select_menu
-        elif value["type"] == "boolean":
-            #Similar to the select type but specifically for boolean values.
-            #The naming could be better then just shoving the key name into
-            #the label but it would require specifying it in the preferences dict.
-            boolean_menu = self.menu_view.children[value["index"]]
-            boolean_menu.min_values = 1
-            boolean_menu.max_values = 1
-            boolean_menu.options = [
-                discord.SelectOption(
-                    label = f"{key} Enabled",
-                    value = "True",
-                    default = value["value"]
-                ),
-                discord.SelectOption(
-                    label = f"{key} Disabled",
-                    value = "False",
-                    default = not value["value"]
-                )
-            ]
-            async def set_value_from_select_menu(
-                interaction,
-                menu_in_question=boolean_menu,
-                key=key
-                ):
-                self.variable_storage.set_value(key, menu_in_question.values == "True")
-                await interaction.response.send_message(
-                    "response",
-                    silent=True,
-                    ephemeral=True,
-                    delete_after=0
-                )
-            boolean_menu.callback = set_value_from_select_menu
-        else:
-            raise ValueError("Invalid preference type in game")
+        element = self.menu_view.children[self.variable_storage.variable_layout["index"]]
+        self.variable_storage[key].assign_ui_element_contents(element, self.menu_view)
 
     def add_menu_items(self):
         """
