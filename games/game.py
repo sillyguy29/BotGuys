@@ -7,6 +7,7 @@ players joining/leaving, ending the game, etc
 import logging
 import discord
 from util import send_info_message, get_disabled_view
+from utils.variable_management.variable_menu import VariableMenu
 
 class BasePlayer():
     """
@@ -94,7 +95,7 @@ class GameManager():
     Methods can (and should) be overridden but be careful when doing so as to not
     break the default flow of all games
     """
-    def __init__(self, game, base_gui, channel, factory, preferences_menu=None):
+    def __init__(self, game, base_gui, channel, factory):
         # hold the game model that this manager needs to manage (pass constructor to
         # subclass of BaseGame for that game)
         self.game = game
@@ -110,8 +111,7 @@ class GameManager():
         # reference to the message that currently contains the base menu. Needed so that the
         # bot can remove the buttons from it or edit its contents at any time
         self.current_active_menu = None
-        # preferences menu layout
-        self.preferences_menu = preferences_menu
+        self.preferences_menu = VariableMenu(self.game.preferences_variables)
 
     async def create_game(self, interaction):
         """

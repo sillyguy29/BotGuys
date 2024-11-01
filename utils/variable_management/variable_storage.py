@@ -8,7 +8,7 @@ class VariableStorage:
     """
     def __init__(self, variables=None):
         self.variables = {}
-        for variable in variables:
+        for variable in [] if variables is None else variables:
             self.variables[variable.name] = variable
 
     def get_value_of(self,name):

@@ -3,6 +3,7 @@ Contains the class for creating and managing a menu that interfaces with a parti
 storage object.
 """
 import discord
+from utils.variable_management.variable_storage import VariableStorage
 
 class VariableMenu:
     """
@@ -10,7 +11,8 @@ class VariableMenu:
     object.
     """
     def __init__(self, variable_storage, variable_order=None):
-        self.variable_storage = variable_storage
+        self.variable_storage = VariableStorage(None) if variable_storage is None else variable_storage 
+        
         if variable_order is None:
             self.variable_layout = {
                 key: {"order": index, "index": None}

@@ -187,7 +187,7 @@ class BooleanVariable(OptionVariable):
                 default_value
             ],
             options=[
-                OptionRepresentation("Enabled", True),
-                OptionRepresentation("Disabled", False)
+                OptionRepresentation(f"{name} Enabled", True),
+                OptionRepresentation(f"{name} Disabled", False)
             ]
         )
