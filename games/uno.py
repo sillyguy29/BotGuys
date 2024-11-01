@@ -61,7 +61,7 @@ class UnoPlayer(BasePlayer):
                 card.name == "Wild" and
                 (
                     not variables.get_value_of(
-                    "Cannot play plus fours with matching color"
+                    "Cannot play wild cards with matching color"
                     ) or
                     top_card.name not in [c.name for c in self.hand]
                 )
@@ -133,7 +133,7 @@ class UnoGame(BaseGame):
             ),
             BooleanVariable("Reverse card repeats players turn",False),
 #unimplemented            BooleanVariable("Can callout Uno",False),
-            BooleanVariable("Cannot play plus fours with matching color",False)
+            BooleanVariable("Cannot play wild cards with matching color",False)
         ]
         self.preferences_variables = VariableStorage(preferences)
         """
