@@ -10,7 +10,6 @@ GAME STATE BREAKDOWN:
 7 -> Game is over (players asked if they want to play again)
 """
 import asyncio
-import discord
 import games.blackjack.blackjack_game as Game
 import games.blackjack.blackjack_views as Views
 from games.game import GameManager
@@ -61,13 +60,9 @@ class BlackjackManager(GameManager):
         # game_state == 4 -> players cannot join or leave
         self.game.game_state = 4
         await interaction.response.send_message(f"{interaction.user.mention} started the game!")
+        # swap default GUI to betting phase buttons
         await self.invalidate_menu(1)
         await self.new_menu(4)
-        return
-        # swap default GUI to betting phase buttons
-        await interaction.channel.send(f"{interaction.user.display_name} started the game!")
-        self.base_gui = Views.ButtonsBetPhase(self)
-        await self.resend(interaction)
 
     async def start_new_round(self, interaction):
         """
@@ -81,12 +76,9 @@ class BlackjackManager(GameManager):
         self.game.game_state = 1
         self.game.betted_players = 0
         await interaction.response.send_message(f"{interaction.user.mention} started a new game!")
+        # allow players to join
         await self.invalidate_menu(7)
         await self.new_menu(1)
-        return
-        # allow players to join
-        self.base_gui = Views.BlackjackButtonsBase(self)
-        await self.resend(interaction)
 
     async def deal_cards(self):
         """
