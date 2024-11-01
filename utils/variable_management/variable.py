@@ -75,8 +75,8 @@ class IntegerVariable(Variable):
             try:
                 val = int(modal_in_question.children[0].value)
                 if not (
-                    self.range_min < val and
-                    self.range_max > val
+                    self.range_min <= val and
+                    self.range_max >= val
                     ):
                     return False
             except ValueError:
