@@ -24,7 +24,7 @@ from utils.variable_management.variable_storage import VariableStorage
 #TODO show settings in join message
 #TODO single instance of preferences_gui view may cause issues with dynamic preference adding.
 #TODO setup rows for preferences menu to fix annoying ui element ordering
-
+#TODO implement effect stacking
 class UnoPlayer(BasePlayer):
     """
     Represents an player of the uno game. Extended from the BasePlayer
@@ -69,6 +69,42 @@ class UnoPlayer(BasePlayer):
         ]
         return playable_cards
 
+    def get_stackable_playable_cards(self, top_card, variables):
+        """
+        returns a list of the playable and stackable cards, used to replace playable cards deck
+        if the player is the target of the card queue
+        """
+        #card type and name to general name categories used in option values dictionary
+        #I am sorry and am on 5 hours of sleep, it is taking me 30 seconds to do 17-7.
+        opt_val = {
+            ("Wild","Draw Four"): "plus_fours",
+        }
+        for color in ('Red', 'Yellow', 'Green', 'Blue'):
+            opt_val[(color, "Draw Two")]= "plus_twos"
+            opt_val[(color, "Skip")]= "effect_cards"
+            opt_val[(color, "Reverse")]= "effect_cards"
+        stackable_cards = [
+            card
+            for card in
+            self.get_playable_cards(top_card,variables)
+            if ((
+        #I would indent better here but the linter settings disallow lines that are longer than 100
+        #characters
+        f"can_stack_{opt_val[(card.name,card.value)]}_on_{opt_val[(top_card.name,top_card.value)]}"
+        in variables.get_value_of("Stacking allowances")
+                ) if ((card.name,card.value) in opt_val) else False
+            )
+        ]
+        return stackable_cards
+
+    def has_stackable_playable_cards(self, top_card, variables):
+        """
+        returns a boolean for if the player has any playable and stackable cards based on the
+        game preferences and their deck.
+        """
+        cards = self.get_stackable_playable_cards(top_card, variables)
+        return len(cards) > 0
+
 class UnoGame(BaseGame):
     """
     Uno game model class to represent the game state of Uno. It is
@@ -98,7 +134,8 @@ class UnoGame(BaseGame):
         self.turn_index = 0
         self.reversed = False
         self.top_card = UnoCard("None", "")
-                #defines the variables for use and display
+        self.queued_cards = []
+        #defines the variables for use and display
         preferences = [
             IntegerVariable("Drawn card show time", 5, range_min=0, range_max=20),
             IntegerVariable("Announcement lifetime", 0, range_min=0, range_max=20),
@@ -106,9 +143,14 @@ class UnoGame(BaseGame):
                 name="Stacking allowances",
                 default_value=[
                     "can_stack_effect_cards_on_effect_cards",
+                    "can_stack_plus_twos_on_effect_cards",
                     "can_stack_plus_fours_on_effect_cards",
-                    "can_stack_effect_cards_on_plus_fours",
-                    "can_stack_plus_fours_on_plus_fours"
+                    "can_stack_effect_cards_on_plus_twos_cards",
+                    "can_stack_plus_twos_on_plus_twos_cards",
+                    "can_stack_plus_fours_on_plus_twos_cards",
+                    "can_stack_effect_cards_on_plus_fours_cards",
+                    "can_stack_plus_twos_on_plus_fours_cards",
+                    "can_stack_plus_fours_on_plus_fours_cards"
                 ],
                 options=[
                     OptionRepresentation(
@@ -116,20 +158,40 @@ class UnoGame(BaseGame):
                         "can_stack_effect_cards_on_effect_cards"
                     ),
                     OptionRepresentation(
+                        "Can stack plus twos on effect cards",
+                        "can_stack_plus_twos_on_effect_cards"
+                    ),
+                    OptionRepresentation(
                         "Can stack plus fours on effect cards",
                         "can_stack_plus_fours_on_effect_cards"
+                    ),
+                    OptionRepresentation(
+                        "Can stack effect cards on plus twos",
+                        "can_stack_effect_cards_on_plus_twos"
+                    ),
+                    OptionRepresentation(
+                        "Can stack plus twos on other plus twos",
+                        "can_stack_plus_twos_on_effect_cards"
+                    ),
+                    OptionRepresentation(
+                        "Can stack plus fours on plus twos",
+                        "can_stack_plus_fours_on_plus_twos"
                     ),
                     OptionRepresentation(
                         "Can stack effect cards on plus fours",
                         "can_stack_effect_cards_on_plus_fours"
                     ),
                     OptionRepresentation(
+                        "Can stack plus twos on other plus fours",
+                        "can_stack_plus_twos_on_effect_fours"
+                    ),
+                    OptionRepresentation(
                         "Can stack plus fours on other plus fours",
                         "can_stack_plus_fours_on_plus_fours"
-                    )
+                    ),
                 ],
                 min_selected=0,
-                max_selected=4
+                max_selected=9
             ),
             BooleanVariable("Reverse card repeats players turn",False),
 #unimplemented            BooleanVariable("Can callout Uno",False),
@@ -521,7 +583,7 @@ class UnoManager(GameManager):
             c. Player has 1 card remaining in hand.
             d. Player won.
         '''
-        await self.channel.send(announcement, 
+        await self.channel.send(announcement,
             delete_after=
             self.game.preferences_variables.get_value_of("Announcement lifetime"),
         )
@@ -780,7 +842,7 @@ class UnoCardButtons(discord.ui.View):
             current_turn_player = self.manager.game.turn_order[self.manager.game.turn_index]
             uno_player = self.manager.game.player_data[player]
             playable_cards = uno_player.get_playable_cards(
-                self.manager.game.top_card, 
+                self.manager.game.top_card,
                 self.manager.game.preferences_variables
             )
             disabled = (
