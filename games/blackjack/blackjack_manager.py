@@ -3,8 +3,13 @@
 Contains all the logic needed to run a game of Blackjack.
 It features an closed game model, meaning not all users can interact
 with the game at any time, and there is player management.
+GAME STATE BREAKDOWN:
+4 -> Betting phase
+5 -> Card dealing phase
+6 -> Dealer's draw
+7 -> Game is over (players asked if they want to play again)
 """
-import discord
+import asyncio
 import games.blackjack.blackjack_game as Game
 import games.blackjack.blackjack_views as Views
 from games.game import GameManager
@@ -12,14 +17,19 @@ from util import double_check
 from util import STANDARD_52_DECK
 from util import cards_to_str_52_standard
 from util import send_info_message
+from util import get_disabled_view
 
 class BlackjackManager(GameManager):
     """
     Blackjack manager class
     """
     def __init__(self, factory, channel):
-        super().__init__(game=Game.BlackjackGame(), base_gui=Views.BlackjackButtonsBase(self),
-                         channel=channel, factory=factory)
+        gui_by_game_state = {0: None, 1: Views.BlackjackButtonsBase(self), 2: None, 3: None,
+                             4: Views.ButtonsBetPhase(self),
+                             5: None, 6:None,
+                             7: Views.QuitGameButton(self)}
+        super().__init__(game=Game.BlackjackGame(), channel=channel, factory=factory,
+                         gui_by_game_state=gui_by_game_state)
 
     async def add_player(self, interaction, init_player_data=None):
         init_player_data = Game.BlackjackPlayer()
@@ -27,6 +37,7 @@ class BlackjackManager(GameManager):
         if interaction.user in self.game.player_data \
         and interaction.user not in self.game.turn_order:
             self.game.turn_order.append(interaction.user)
+            await self.refresh(interaction)
 
     async def remove_player(self, interaction):
         await super().remove_player(interaction)
@@ -48,10 +59,10 @@ class BlackjackManager(GameManager):
             return
         # game_state == 4 -> players cannot join or leave
         self.game.game_state = 4
+        await interaction.response.send_message(f"{interaction.user.mention} started the game!")
         # swap default GUI to betting phase buttons
-        await interaction.channel.send(f"{interaction.user.display_name} started the game!")
-        self.base_gui = Views.ButtonsBetPhase(self)
-        await self.resend(interaction)
+        await self.invalidate_menu(1)
+        await self.new_menu(4)
 
     async def start_new_round(self, interaction):
         """
@@ -64,9 +75,10 @@ class BlackjackManager(GameManager):
         self.game.turn_index = -1
         self.game.game_state = 1
         self.game.betted_players = 0
+        await interaction.response.send_message(f"{interaction.user.mention} started a new game!")
         # allow players to join
-        self.base_gui = Views.BlackjackButtonsBase(self)
-        await self.resend(interaction)
+        await self.invalidate_menu(7)
+        await self.new_menu(1)
 
     async def deal_cards(self):
         """
@@ -75,6 +87,7 @@ class BlackjackManager(GameManager):
         # make sure we're at the end of the betting phase
         if self.game.game_state != 4:
             return
+        await self.invalidate_menu(4)
         # game_state 5 -> dealing phase (players cannot join or leave)
         self.game.game_state = 5
 
@@ -98,16 +111,15 @@ class BlackjackManager(GameManager):
             self.game.dealer_hidden_card = None
             self.game.dealer_hand.append(hidden_card)
 
-        await self.interactionless_resend(use_gui=False)
         # if dealer's hidden card is None, that means we added it to
         # its hand because it got blackjack
         if self.game.dealer_hidden_card is None:
             self.channel.send("Dealer got blackjack! House wins!")
+            await asyncio.sleep(2)
             # move straight to payout phase
             self.make_payout(21)
         else:
             # otherwise initiate play phase
-            self.base_gui = Views.BlackjackButtonsBaseGame(self)
             await self.start_next_player_turn()
 
     async def start_next_player_turn(self):
@@ -119,8 +131,11 @@ class BlackjackManager(GameManager):
         if self.game.turn_index == self.game.players:
             await self.channel.send("All players have had their turn, starting dealer draw!")
             self.game.game_state = 6
+            await asyncio.sleep(2)
             await self.dealer_draw()
             return
+
+        await self.new_menu(0)
 
         # retrieving data
         active_player = self.game.get_active_player()
@@ -133,6 +148,7 @@ class BlackjackManager(GameManager):
         if value == 21:
             await self.channel.send(f"{active_player.mention} got blackjack! Moving on...")
             active_player_data.current_payout_multiplier = 2.5
+            await asyncio.sleep(2)
             await self.start_next_player_turn()
             return
         active_player_data.hand_value = value
@@ -146,11 +162,14 @@ class BlackjackManager(GameManager):
         # wait for the user to press hit or stand, then remove the
         # buttons from the menu once they do
         await hit_me_view.wait()
-        await active_msg.edit(view=None)
+        await active_msg.edit(view=await get_disabled_view(hit_me_view))
 
     def get_base_menu_string(self):
         if self.game.game_state == 1:
-            return "Who's ready for a game of blackjack?"
+            ret = "Who's ready for a game of blackjack?\nCurrent Players:"
+            for player in self.game.turn_order:
+                ret = ret + f"\n\t{player.display_name}"
+            return ret
 
         if self.game.game_state == 4:
             ret = "Current bets and chips:\n"
@@ -169,7 +188,7 @@ class BlackjackManager(GameManager):
                 ret += f"\n{player.mention} {player_data.get_play_phase_str()}"
             return ret
 
-        return "You shouldn't be seeing this."
+        return "Whoops, something went wrong, ignore this message."
 
     async def hit_user(self, interaction):
         """
@@ -226,13 +245,14 @@ class BlackjackManager(GameManager):
         # alert players of the new draw and allow them to go again
         response_message += (f"\nTheir hand is now "
                              f"{cards_to_str_52_standard(active_player_data.hand)}, "
-                             f"which has a max value of {active_player_data.hand_value}! ")
-        response_message += "What next?"
+                             f"which has a max value of {active_player_data.hand_value}!")
+        await interaction.response.send_message(response_message)
+        await asyncio.sleep(2)
         hit_me_view = Views.HitOrStand(self, active_player)
-        active_msg = await self.channel.send(response_message, view=hit_me_view)
+        active_msg = await self.channel.send("What next?", view=hit_me_view)
         # wait for the buttons to be pressed and remove once one has
         await hit_me_view.wait()
-        await active_msg.edit(view=None)
+        await active_msg.edit(view=await get_disabled_view(hit_me_view))
 
     async def make_bet(self, interaction, bet_amount):
         """
@@ -281,11 +301,13 @@ class BlackjackManager(GameManager):
                                f"{cards_to_str_52_standard([self.game.dealer_hidden_card])}!"))
             self.game.dealer_hand.append(self.game.dealer_hidden_card)
             self.game.dealer_hidden_card = None
+            await asyncio.sleep(2)
 
         (_, hand_value) = bj_add(self.game.dealer_hand)
         await self.channel.send((f"Dealer's hand is "
                                     f"{cards_to_str_52_standard(self.game.dealer_hand)}, "
                                     f"which has a total value of {hand_value}!"))
+        await asyncio.sleep(2)
 
         # keep drawing until the deal exceeds 17 cards (bust or not)
         while hand_value < 17:
@@ -308,6 +330,7 @@ class BlackjackManager(GameManager):
             await self.channel.send((f"Dealer's hand is "
                                      f"{cards_to_str_52_standard(self.game.dealer_hand)}, "
                                      f"which has a total value of {hand_value}!"))
+            await asyncio.sleep(2)
 
         # treat dealer's hand as 0 if it busts (so any non-busted
         # player is treated as winning)

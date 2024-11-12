@@ -1,58 +1,23 @@
-"""
-Contains all views for blackjack
-"""
 import discord
-from util import send_info_message
 
 
-class QuitGameButton(discord.ui.View):
+class PokerButtonsBase(discord.ui.View):
     """
     Button set that asks players if they want to play the game again
     """
     def __init__(self, manager):
-        super().__init__(timeout=None)
-        self.manager = manager
-        self.disabled_view = None
-
-    @discord.ui.button(label = "Go Again!", style = discord.ButtonStyle.green)
-    async def restart(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """
-        Start a new round
-        """
-        # print when someone presses the button because otherwise
-        # pylint won't shut up about button being unused
-        print(f"{interaction.user} pressed {button.label}!")
-        # stop accepting input
-        self.stop()
-        await self.manager.start_new_round(interaction)
-
-    @discord.ui.button(label = "End Game", style = discord.ButtonStyle.red)
-    async def quit(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """
-        Quit the game
-        """
-        # print when someone presses the button because otherwise
-        # pylint won't shut up about button being unused
-        print(f"{interaction.user} pressed {button.label}!")
-        # stop eccepting input
-        self.stop()
-        await interaction.channel.send(f"{interaction.user.mention} ended the game!")
-        await self.manager.quit_game(interaction)
-
-
-class BlackjackButtonsBase(discord.ui.View):
-    """
-    Initial "join game" buttons
-    """
-    def __init__(self, manager):
-        super().__init__(timeout=None)
+        super().__init__()
         self.manager = manager
         self.disabled_view = None
 
     @discord.ui.button(label = "Join", style = discord.ButtonStyle.green)
     async def join(self, interaction: discord.Interaction, button: discord.ui.Button):
         """
-        Lets the player join the game
+        Send an ephemeral message to the person who interacted with
+        this button that contains the hit or miss menu. This menu
+        will be deleted after it is interacted with or 60 seconds
+        has passed (prevents menus that are not accounted for after
+        game end).
         """
         # print when someone presses the button because otherwise
         # pylint won't shut up about button being unused
@@ -83,17 +48,17 @@ class BlackjackButtonsBase(discord.ui.View):
         await self.manager.start_game(interaction)
 
 
-class BlackjackButtonsBaseGame(discord.ui.View):
+class PokerButtonsBaseGame(discord.ui.View):
     """
-    Literally just a resend button
+    Button set that asks players if they want to play the game again
     """
     def __init__(self, manager):
-        super().__init__(timeout=None)
+        super().__init__()
         self.manager = manager
         self.disabled_view = None
 
     @discord.ui.button(label = "Resend", style = discord.ButtonStyle.gray)
-    async def resend(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def start(self, interaction: discord.Interaction, button: discord.ui.Button):
         """
         Resend base menu message
         """
@@ -103,10 +68,9 @@ class BlackjackButtonsBaseGame(discord.ui.View):
         # resend
         await self.manager.resend(interaction)
 
-
 class BetModal(discord.ui.Modal):
     """
-    Contains the popup box that shows when players make their bets
+    Modal that allows the user to enter a bet
     """
     def __init__(self, manager):
         super().__init__(title="Bet")
@@ -131,18 +95,39 @@ class BetModal(discord.ui.Modal):
         print(f"{interaction.user} bet {user_response} chips.")
         await self.manager.make_bet(interaction, user_response)
 
-
+# todo: make each button call different functions with some shared logic?
 class ButtonsBetPhase(discord.ui.View):
     """
-    Contains the "bet" button and also keeps track of players who have
-    placed bets
+    Button set that allows players to bet
     """
     def __init__(self, manager):
-        super().__init__(timeout=None)
+        super().__init__()
         self.manager = manager
         self.disabled_view = None
 
-    @discord.ui.button(label = "Bet!", style = discord.ButtonStyle.green)
+    @discord.ui.button(label = "View Hand", style = discord.ButtonStyle.blurple)
+    async def hit_me(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        Let the user view their hand
+        """
+        print(f"{interaction.user} pressed {button.label}!")
+        # send the user their hand
+        current_player = self.manager.game.player_data[interaction.user]
+        if len(current_player.hand) != 2:
+            raise ValueError("Player hand must contain 2 cards")
+        message = f"Your hand is {cards_to_str_52_standard(current_player.hand)}"
+        await interaction.response.send_message(message, ephemeral = True, delete_after = 60)
+
+    @discord.ui.button(label = "Call", style = discord.ButtonStyle.green)
+    async def call(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        Call
+        """
+        print(f"{interaction.user} pressed {button.label}!")
+        await self.manager.make_bet(interaction, self.manager.game.largest_bet
+            - self.manager.game.player_data[interaction.user].round_bet)
+
+    @discord.ui.button(label = "Raise", style = discord.ButtonStyle.red)
     async def bet(self, interaction: discord.Interaction, button: discord.ui.Button):
         """
         Allows the user to bring up the betting menu
@@ -152,43 +137,50 @@ class ButtonsBetPhase(discord.ui.View):
             return
         await interaction.response.send_modal(BetModal(self.manager))
 
+    @discord.ui.button(label = "Fold", style = discord.ButtonStyle.gray)
+    async def fold(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        Fold
+        """
+        print(f"{interaction.user} pressed {button.label}!")
+        #Fold
+        self.manager.game.player_data[interaction.user].active = False
+        self.manager.game.active_player_turn_order.remove(interaction.user)
+        self.manager.base_gui = None
+        await interaction.response.send_message(f"{interaction.user.mention} has folded!")
+        await self.next_player(interaction, True)
 
-class HitOrStand(discord.ui.View):
+
+class QuitGameButton(discord.ui.View):
     """
-    Contains the "hit" and "stand" buttons when it's a certain player's
-    turn. Keeps track of which player's turn it is and denies input
-    to other players
+    Button set that asks players if they want to play the game again
     """
-    def __init__(self, manager, active_player):
-        super().__init__(timeout=None)
+    def __init__(self, manager):
+        super().__init__()
         self.manager = manager
-        self.active_player = active_player
         self.disabled_view = None
 
-    @discord.ui.button(label = "Hit Me!", style = discord.ButtonStyle.green)
-    async def hit_me(self, interaction: discord.Interaction, button: discord.ui.Button):
+    @discord.ui.button(label = "Go Again!", style = discord.ButtonStyle.green)
+    async def restart(self, interaction: discord.Interaction, button: discord.ui.Button):
         """
-        Check if the interaction is valid, and if so, call hit_user
+        Start a new round
         """
+        # print when someone presses the button because otherwise
+        # pylint won't shut up about button being unused
         print(f"{interaction.user} pressed {button.label}!")
-        if interaction.user != self.active_player:
-            await send_info_message("It's not your turn.", interaction)
-            return
-        # stop accepting interactions for this message
+        # stop accepting input
         self.stop()
-        await self.manager.hit_user(interaction)
+        await self.manager.start_new_round(interaction)
 
-    @discord.ui.button(label = "Stand", style = discord.ButtonStyle.blurple)
-    async def stand(self, interaction: discord.Interaction, button: discord.ui.Button):
+    @discord.ui.button(label = "End Game", style = discord.ButtonStyle.red)
+    async def quit(self, interaction: discord.Interaction, button: discord.ui.Button):
         """
-        Check if the interaction is valid, and if so, make the user stand
-        and start the next player's turn
+        Quit the game
         """
-        if interaction.user != self.active_player:
-            await send_info_message("It's not your turn.", interaction)
-            return
+        # print when someone presses the button because otherwise
+        # pylint won't shut up about button being unused
         print(f"{interaction.user} pressed {button.label}!")
-        await interaction.response.send_message(f"{self.active_player.display_name} is standing!")
-        # stop accepting interactions for this message
+        # stop eccepting input
         self.stop()
-        await self.manager.start_next_player_turn()
+        await interaction.channel.send(f"{interaction.user.mention} ended the game!")
+        await self.manager.quit_game(interaction)

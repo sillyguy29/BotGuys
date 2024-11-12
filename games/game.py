@@ -3,11 +3,19 @@
 Defines abstract classes for the model and manager which are used to
 control basic things that exist for all game types, such as starting,
 players joining/leaving, ending the game, etc
+GAME STATES BREAKDOWN:
+-1 -> Game is over
+0 -> Game is open to anyone at any time
+1 -> Players can join and leave
+2 -> Players can join but not leave
+3 -> Players can leave but not join
 """
 import logging
 import discord
 from util import send_info_message, get_disabled_view
 from utils.variable_management.variable_menu import VariableMenu
+
+# TODO fix self.game.preferences_variables issue
 
 class BasePlayer():
     """
@@ -22,13 +30,30 @@ class BasePlayer():
         """
         return ""
 
+class FakeUser():
+    """
+    Fake discord user used for debugging
+    """
+    def __init__(self, fake_name, controller):
+        self.fake_name = fake_name
+        self.controller = controller
+
+    def __eq__(self, other: object):
+        if isinstance(other, discord.User):
+            logging.debug("Fake user comparison, other object is an actual user")
+            return self.controller == other
+        if isinstance(other, FakeUser):
+            logging.debug("Fake user comparison, other object is a fake user")
+            return self.fake_name == other.fake_name
+        logging.debug("Fake user comparison, can't figure out other object type, returning false")
+        return False
 
 class BaseGame():
     """
     Game model class. Member vars should only be accessed by its manager or AI functions.
     """
     def __init__(self, game_type=0, player_data=None, game_state=0,
-                 user_id=None, players=0, cpus=0, max_players=0):
+                 user_id=None, players=0, cpus=0, max_players=0, fake_players=None):
         # ID value of the game type
         self.game_type = game_type
         # list of players engaged with this game
@@ -43,6 +68,8 @@ class BaseGame():
         # game_state = 0 -> game is open to anyone at any time
         self.game_state = game_state
         self.max_players = max_players
+        # dict of fake players
+        self.fake_players = fake_players
 
     def has_ended(self):
         """
@@ -95,14 +122,10 @@ class GameManager():
     Methods can (and should) be overridden but be careful when doing so as to not
     break the default flow of all games
     """
-    def __init__(self, game, base_gui, channel, factory):
+    def __init__(self, game, channel, factory, preferences_gui=None, gui_by_game_state=None):
         # hold the game model that this manager needs to manage (pass constructor to
         # subclass of BaseGame for that game)
         self.game = game
-        # default button layout that the bot can use to construct the base menu at any time
-        self.base_gui = base_gui
-        # disabled version of the base GUI that the bot can access when needed
-        self.base_gui_disabled = None
         # ID of the channel that this game is taking place in
         self.channel = channel
         # reference to the GameFactory class, needed to remove the game from the active games
@@ -111,6 +134,7 @@ class GameManager():
         # reference to the message that currently contains the base menu. Needed so that the
         # bot can remove the buttons from it or edit its contents at any time
         self.current_active_menu = None
+        self.gui_by_game_state = gui_by_game_state
         self.preferences_menu = VariableMenu(self.game.preferences_variables)
 
     async def create_game(self, interaction):
@@ -122,12 +146,39 @@ class GameManager():
         # construct the first base menu message, grabbing the buttons from self.base_gui
         # and the message contents from self.get_base_menu_string
         await interaction.response.send_message(content=self.get_base_menu_string(),
-                                                view=self.base_gui, silent=True)
+                                                view=self.gui_by_game_state[self.game.game_state],
+                                                silent=True)
         # set our base menu message to the message that the interaction (ie the slash command
         # that started the game) was responded with (the base menu created by this interaction)
         self.current_active_menu = await interaction.original_response()
-        # also make sure to get the disabled version of the base GUI befor it gets changed
-        self.base_gui_disabled = await get_disabled_view(self.base_gui)
+
+    async def invalidate_menu(self, state):
+        """
+        Replaces an old active menu with its disabled version, as long as the state arg
+        matches with the game state that the menu is for
+        """
+        await self.current_active_menu.edit(view=await get_disabled_view(
+                                                       self.gui_by_game_state[state]))
+
+    async def new_menu(self, state):
+        """
+        Sends a new message with a the menu corresponding with the game state provided
+        by the state arg
+        """
+        self.current_active_menu = await self.channel.send(content=self.get_base_menu_string(),
+                                                           view=self.gui_by_game_state[state],
+                                                           silent=True)
+
+    async def progress_game(self, old_state, new_state):
+        """
+        Runs both invalidate_menu and new_menu (may want to deprecate later)
+        """
+        # disable the old menu
+        await self.current_active_menu.edit(view=await get_disabled_view(
+                                                       self.gui_by_game_state[old_state]))
+
+        self.current_active_menu = await self.channel.send(content=self.get_base_menu_string(),
+                                                           view=self.gui_by_game_state[new_state])
 
     async def refresh(self, interaction):
         """
@@ -139,7 +190,7 @@ class GameManager():
             return
 
         await self.current_active_menu.edit(content=self.get_base_menu_string(),
-                                            view=self.base_gui)
+                                            view=self.gui_by_game_state[self.game.game_state])
         self.quick_log("Base menu refreshed")
 
     async def resend(self, interaction, use_gui=True):
@@ -152,19 +203,19 @@ class GameManager():
             return
 
         # changes the view to the disabled version
-        await self.current_active_menu.edit(view=self.base_gui_disabled)
-        # InteractionMessage inherits from Message so we can access the channel attribute to
-        # send a new base menu into
-        if use_gui == True:
-            self.current_active_menu = await self.channel.send(self.get_base_menu_string(),
-                                                               view=self.base_gui, silent=True)
-            # Get the disabled version of the current gui (could potentially do nothing)
-            self.base_gui_disabled = await get_disabled_view(self.base_gui)
+        await self.current_active_menu.edit(view=await get_disabled_view(
+                                            self.gui_by_game_state[self.game.game_state]))
+        if use_gui is True:
+            # Send with a GUI
+            self.current_active_menu = await self.channel.send(
+                                             self.get_base_menu_string(),
+                                             view=self.gui_by_game_state[self.game.game_state],
+                                             silent=True)
         else:
+            # Send with no GUI
             self.current_active_menu = await self.channel.send(self.get_base_menu_string(),
                                                                view=None, silent=True)
-            # We don't want to add in a menu to this message later
-            self.base_gui_disabled = None
+
         self.quick_log("Base menu resent")
 
     async def interactionless_resend(self, use_gui=True):
@@ -177,19 +228,18 @@ class GameManager():
             return
 
         # changes the view to the disabled version
-        await self.current_active_menu.edit(view=self.base_gui_disabled)
-        # InteractionMessage inherits from Message so we can access the channel attribute to
-        # send a new base menu into
-        if use_gui == True:
-            self.current_active_menu = await self.channel.send(self.get_base_menu_string(),
-                                                               view=self.base_gui, silent=True)
-            # Get the disabled version of the current gui (could potentially do nothing)
-            self.base_gui_disabled = await get_disabled_view(self.base_gui)
+        await self.current_active_menu.edit(view=await get_disabled_view(
+                                            self.gui_by_game_state[self.game.game_state]))
+        if use_gui is True:
+            # Send with a GUI
+            self.current_active_menu = await self.channel.send(
+                                             self.get_base_menu_string(),
+                                             view=self.gui_by_game_state[self.game.game_state],
+                                             silent=True)
         else:
+            # Send with no GUI
             self.current_active_menu = await self.channel.send(self.get_base_menu_string(),
                                                                view=None, silent=True)
-            # We don't want to add in a menu to this message later
-            self.base_gui_disabled = None
         self.quick_log("Base menu resent")
 
 
@@ -389,7 +439,7 @@ class GameManager():
         Returns a string with all members of the class for debug
         """
         return ("Base manager:\n"
-                f"\tbase_gui: {self.base_gui}\n"
+                f"\tbase_gui: {self.gui_by_game_state}\n"
                 f"\tchannel id: {self.channel.id}\n" + self.game.get_debug_str())
 
     def quick_log(self, content, interaction=None, level=logging.DEBUG):

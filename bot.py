@@ -9,8 +9,10 @@ import logging
 import datetime
 import discord
 import cmd_control
+from typing import Literal
 from configs import config
 from games import gamefactory
+from util import FeedbackModal
 
 
 # Inherit the discord client class so we can override some methods
@@ -83,11 +85,30 @@ def create_commands(client):
         logging.info("Force quit slash command used in channel [%i]", interaction.channel_id)
         await client.game_factory.force_quit(interaction)
 
+    @client.tree.command(name="send-feedback",
+                         description="Anonymously sends feedback directly to the developers")
+    @discord.app_commands.describe(
+        type=("The type of feedback you want to give")
+    )
+    async def send_feedback(interaction: discord.Interaction,
+                            type: Literal["Feature Request", "Bug Report", "Other"]):
+        logging.info("Feedback command used in chanel [%i]", interaction.channel_id)
+        await interaction.response.send_modal(FeedbackModal(type))
+
     @client.tree.command(name="test-modal",
                          description="Brings up a testing modal")
     async def test_modal(interaction: discord.Interaction):
         logging.info("Test modal slash command used in channel [%i]", interaction.channel_id)
         await interaction.response.send_modal(TestModal())
+
+    @client.tree.command(name="add-fake-user",
+                         description="Adds a fake user to the current active game")
+    @discord.app_commands.describe(
+        user_name="The name of the fake user"
+    )
+    async def add_fake_user(interaction: discord.interaction, user_name="Player1"):
+        logging.info("Fake user slash command used in channel [%i]", interaction.channel_id)
+        await client.game_factor
 
     @client.tree.command(name="getdebugdata", description="Get internal data for one or all games")
     @discord.app_commands.describe(
@@ -136,6 +157,9 @@ def create_commands(client):
             handler = client.file_handler
         elif handler_type == 1:
             handler = client.cmd_handler
+        else:
+            await interaction.response.send_message("Invalid handler type.")
+            return
         handler.setLevel(log_level)
         r = {"msg": f"Log level changed to {log_level}"}
         record = logging.makeLogRecord(r)

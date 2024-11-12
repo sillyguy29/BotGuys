@@ -1,5 +1,9 @@
+"""
+File for random stuff that doesn't have a clear place
+"""
 import random
 import logging
+import datetime
 import discord
 
 class Card:
@@ -171,6 +175,10 @@ async def get_disabled_view(view):
     Returns a version of the view with all buttons disabled, and attaches that menu to
     the main menu object so it can be performed faster the next time this happens
     """
+    # skip if there isn't supposed to be a GUI here
+    if view is None:
+        return None
+
     if view.disabled_view is not None:
         return view.disabled_view
 
@@ -190,8 +198,31 @@ async def get_disabled_view(view):
     disabled_view = discord.ui.View(timeout = 0)
     for item in children:
         disabled_view.add_item(item)
-    
+
     # Add this new view to the old view so we don't
     # have to do this again in the future, and return
     view.disabled_view = disabled_view
     return disabled_view
+
+class FeedbackModal(discord.ui.Modal):
+    """
+    Modal for taking user feedback
+    """
+    def __init__(self, type):
+        super().__init__(title="Feedback")
+        self.type = type
+
+    fb_input = discord.ui.TextInput(label="Type feedback here",
+                                    max_length=500,
+                                    placeholder="Enter feedback here...",
+                                    style=discord.TextStyle.long)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        """
+        Overriden method that activates when the user submits the form.
+        """
+        date = str(datetime.datetime.now(datetime.timezone.utc)).replace(":", " ")
+        with open(f"./feedback/fb_{date}_{str(self.type)}.txt",
+                  mode="w", encoding="utf8") as f_file:
+            f_file.write(str(self.fb_input))
+        interaction.response.send_message("Thanks for the feedback!", ephemeral=True)
