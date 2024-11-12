@@ -556,7 +556,7 @@ class UnoManager(GameManager):
         # If "Reverse" card was played, reverse the queue
         if card.value == "Reverse":
             self.game.reversed = not self.game.reversed
-            self.game.queued_cards.push(card)
+            self.game.queued_cards.append(card)
             if not self.game.preferences_variables.get_value_of(
                     "Reverse card repeats players turn"
                 ):
@@ -564,19 +564,19 @@ class UnoManager(GameManager):
             await self.announce("Reversing the turn order!")
         # If "Skip" was played, flag them as 'skipped'
         if card.value == "Skip":
-            self.game.queued_cards.push(card)
+            self.game.queued_cards.append(card)
             await self.announce(victim_name + " got skipped! LOL!")
             victim_unoplayer.skipped = True
         # If "Draw Two" was played, make next player draw two cards
         #    and then flag them as 'skipped'
         if card.value == "Draw Two":
-            self.game.queued_cards.push(card)
+            self.game.queued_cards.append(card)
             #await self.announce(victim_name + " eats two cards! LMAO!")
             #await self.draw_cards(victim_unoplayer, 2)
         # If "Draw Four" was played, make next player draw four cards
         #    and then flag them as 'skipped'
         if card.value == "Draw Four":
-            self.game.queued_cards.push(card)
+            self.game.queued_cards.append(card)
             #await self.announce(victim_name + " eats four cards! ROFL!!")
             #await self.draw_cards(victim_unoplayer, 4)
         # Remove the played card from the player's hand
@@ -891,9 +891,6 @@ class UnoButtonsBaseGame(discord.ui.View):
         await self.manager.announce(str(interaction.user) + " is drawing a card...")
         await self.manager.next_turn()
 
-
-
-
 class UnoCardButtons(discord.ui.View):
     """
     Creates private group of buttons representing the cards in a user's hand
@@ -923,7 +920,8 @@ class UnoCardButtons(discord.ui.View):
             disabled = (
                 player != current_turn_player) or (
                 card not in playable_cards)
-            self.add_item(CardButton(self.manager, card, disabled))
+            if(len(self.children) != 25):
+                self.add_item(CardButton(self.manager, card, disabled))
 
 
 
