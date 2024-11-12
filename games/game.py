@@ -27,30 +27,13 @@ class BasePlayer():
         """
         return ""
 
-class FakeUser():
-    """
-    Fake discord user used for debugging
-    """
-    def __init__(self, fake_name, controller):
-        self.fake_name = fake_name
-        self.controller = controller
-
-    def __eq__(self, other: object):
-        if isinstance(other, discord.User):
-            logging.debug("Fake user comparison, other object is an actual user")
-            return self.controller == other
-        if isinstance(other, FakeUser):
-            logging.debug("Fake user comparison, other object is a fake user")
-            return self.fake_name == other.fake_name
-        logging.debug("Fake user comparison, can't figure out other object type, returning false")
-        return False
 
 class BaseGame():
     """
     Game model class. Member vars should only be accessed by its manager or AI functions.
     """
     def __init__(self, game_type=0, player_data=None, game_state=0,
-                 user_id=None, players=0, cpus=0, max_players=0, fake_players=None):
+                 user_id=None, players=0, cpus=0, max_players=0):
         # ID value of the game type
         self.game_type = game_type
         # list of players engaged with this game
@@ -65,8 +48,6 @@ class BaseGame():
         # game_state = 0 -> game is open to anyone at any time
         self.game_state = game_state
         self.max_players = max_players
-        # dict of fake players
-        self.fake_players = fake_players
 
     def has_ended(self):
         """
@@ -336,15 +317,6 @@ class GameManager():
         else:
             self.quick_log("Couldn't join game (bad gs)", interaction)
             await send_info_message("This game is not currently accepting players.", interaction)
-
-    async def add_fake_player(self, interaction, fake_player_name):
-        """
-        Adds a fake player to the game for debugging purposes
-        """
-        if self.game.fake_players is None:
-            self.game.fake_players = dict()
-        if interaction.user not in self.game.fake_players:
-            self.game.fake_players[interaction.user] = 
 
     async def remove_player(self, interaction):
         """
