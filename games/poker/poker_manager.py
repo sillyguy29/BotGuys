@@ -3,6 +3,9 @@
 Contains all the logic needed to run a game of Texas Hold'em Poker.
 It features an closed game model, meaning not all users can interact
 with the game at any time, and there is player management.
+GAME STATE BREAKDOWN:
+4 -> Betting phase
+5 -> Card dealing phase
 """
 import random
 from itertools import combinations
@@ -76,10 +79,10 @@ class PokerManager(GameManager):
             self.game.active_player_turn_order.append(player)
 
         await self.invalidate_menu(1)
+        await interaction.channel.send(f"{interaction.user.display_name} started the game!")
 
         # swap default GUI to betting phase buttons
-        await interaction.channel.send(f"{interaction.user.display_name} started the game!")
-        await self.deal_cards(interaction)
+        await self.new_menu(4)
 
     async def start_new_round(self, interaction):
         """
@@ -134,7 +137,7 @@ class PokerManager(GameManager):
         # check to see if it is the user's turn
         user = interaction.user
         if self.game.active_player_turn_order[self.game.turn_index] != user:
-            await send_info_message("This is not your turn yet.", interaction)
+            await send_info_message("It is not your turn yet.", interaction)
             return
 
         # check to see if the user can bet, and deny them if not

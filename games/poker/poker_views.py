@@ -1,5 +1,6 @@
 import discord
 
+
 class PokerButtonsBase(discord.ui.View):
     """
     Button set that asks players if they want to play the game again
@@ -94,7 +95,7 @@ class BetModal(discord.ui.Modal):
         print(f"{interaction.user} bet {user_response} chips.")
         await self.manager.make_bet(interaction, user_response)
 
-
+# todo: make each button call different functions with some shared logic?
 class ButtonsBetPhase(discord.ui.View):
     """
     Button set that allows players to bet
@@ -103,32 +104,6 @@ class ButtonsBetPhase(discord.ui.View):
         super().__init__()
         self.manager = manager
         self.disabled_view = None
-
-    async def next_player(self, interaction: discord.Interaction, folded):
-        """
-        Add a player to the bet count, once all players have bet,
-        the manager moves to the dealing phase
-        """
-        if not folded:
-            self.manager.game.turn_index += 1
-        if self.manager.game.turn_index >= len(self.manager.game.active_player_turn_order):
-            self.manager.game.turn_index = 0
-            if len(self.manager.game.active_player_turn_order) == 0:
-                await self.manager.finalize_game(interaction)
-            else:
-                bet_set = True
-                for player in self.manager.game.player_data:
-                    if self.manager.game.player_data[player].active \
-                    and (self.manager.game.player_data[player].round_bet !=
-                        self.manager.game.largest_bet):
-                        bet_set = False
-                if bet_set:
-                    if self.manager.game.game_state == 5:
-                        self.manager.game.game_state = 6
-                    for player in self.manager.game.turn_order:
-                        self.manager.game.player_data[player].round_bet = 0
-                    await self.manager.deal_table(interaction)
-
 
     @discord.ui.button(label = "View Hand", style = discord.ButtonStyle.blurple)
     async def hit_me(self, interaction: discord.Interaction, button: discord.ui.Button):

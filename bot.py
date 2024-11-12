@@ -101,6 +101,15 @@ def create_commands(client):
         logging.info("Test modal slash command used in channel [%i]", interaction.channel_id)
         await interaction.response.send_modal(TestModal())
 
+    @client.tree.command(name="add-fake-user",
+                         description="Adds a fake user to the current active game")
+    @discord.app_commands.describe(
+        user_name="The name of the fake user"
+    )
+    async def add_fake_user(interaction: discord.interaction, user_name="Player1"):
+        logging.info("Fake user slash command used in channel [%i]", interaction.channel_id)
+        await client.game_factor
+
     @client.tree.command(name="getdebugdata", description="Get internal data for one or all games")
     @discord.app_commands.describe(
         channel_id=("The ID of the channel with an active game to get the"
