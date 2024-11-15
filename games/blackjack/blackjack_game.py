@@ -1,6 +1,7 @@
 """
 Contains game/player data for blackjack games
 """
+import random
 from games.game import BaseGame
 from games.game import BasePlayer
 from util import cards_to_str_52_standard
@@ -67,6 +68,20 @@ class BlackjackPlayer(BasePlayer):
         return (f"{self.current_bet} x {self.current_payout_multiplier} = "
                 f"{round(self.current_bet * self.current_payout_multiplier)} + {self.chips} = "
                 f"{round(self.current_bet * self.current_payout_multiplier) + self.chips}")
+
+
+class BlackJackAIPlayer(BlackjackPlayer):
+    """
+    Contains AI functions
+    """
+    def __init__(self, name, ai_type=0, controller=None):
+        super().__init__()
+
+        self.ai_type = ai_type
+        self.controller = controller
+
+    def choose_bet(self):
+        return random.randint(0, self.chips)
 
 
 class BlackjackGame(BaseGame):

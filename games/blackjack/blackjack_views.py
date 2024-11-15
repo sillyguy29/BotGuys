@@ -60,6 +60,13 @@ class BlackjackButtonsBase(discord.ui.View):
 
         await self.manager.add_player(interaction)
 
+    @discord.ui.button(label = "Add CPU", style = discord.ButtonStyle.blurple)
+    async def add_cpu(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """
+        Adds a CPU player
+        """
+        await self.manager.add_cpu(0, interaction)
+
     @discord.ui.button(label = "Quit", style = discord.ButtonStyle.red)
     async def quit(self, interaction: discord.Interaction, button: discord.ui.Button):
         """

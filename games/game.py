@@ -14,6 +14,26 @@ import logging
 import discord
 from util import send_info_message, get_disabled_view
 
+class AIUser():
+    """
+    Designed to mimic the discord.py user class
+    """
+    def __init__(self, name):
+        self.true_name = name
+        self.name = f"{name} :robot:"
+        self.mention = f"{name} :robot:"
+        self.global_name = f"{name} :robot:"
+        self.display_name = f"{name} :robot:"
+        self.bot = True
+
+    def __eq__(self, other):
+        if not isinstance(other, AIUser):
+            return False
+        return other.true_name == self.true_name
+
+    def __hash__(self):
+        return hash(self.true_name)
+
 class BasePlayer():
     """
     Generic player data class
@@ -288,12 +308,16 @@ class GameManager():
             return False
         return True
 
-    async def add_player(self, interaction, init_player_data=None):
+    async def add_player(self, interaction, user=None, init_player_data=None):
         """
         Check whether a player can be added to the game in its current state, and if so,
         add them and associate them with init_player_data.
         """
-        self.quick_log("Attempting to join game", interaction)
+        if user is None:
+            user = interaction.user
+            self.quick_log("Attempting to join game", interaction)
+        else:
+            self.quick_log("Attempting to add AI player")
         # see if game has already ended, return if it has
         if await self.game_end_check(interaction):
             return
@@ -303,13 +327,13 @@ class GameManager():
             await send_info_message("This game is open to any player at any time.", interaction)
 
         elif self.game.game_state in (1, 2):
-            if self.user_in_game(interaction.user):
+            if self.user_in_game(user):
                 self.quick_log("Couldn't join game (already joined)", interaction)
                 await send_info_message("You are already in this game.", interaction)
             else:
                 self.game.players += 1
-                self.game.player_data[interaction.user] = init_player_data
-                await interaction.response.send_message((f"{interaction.user.mention} "
+                self.game.player_data[user] = init_player_data
+                await interaction.response.send_message((f"{user.mention} "
                                                          "joined the game!"))
                 self.quick_log("Joined game successfully", interaction)
 
