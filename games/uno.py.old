@@ -25,6 +25,7 @@ from utils.variable_management.variable_storage import VariableStorage
 #TODO single instance of preferences_gui view may cause issues with dynamic preference adding.
 #TODO setup rows for preferences menu to fix annoying ui element ordering
 #TODO implement effect stacking
+#TODO reimplement UNO from scratch to use new view system
 class UnoPlayer(BasePlayer):
     """
     Represents an player of the uno game. Extended from the BasePlayer
@@ -257,7 +258,6 @@ class UnoManager(GameManager):
 
         super().__init__(
             game=UnoGame(user_id),
-            base_gui=UnoButtonsBase(self),
             channel=channel,
             factory=factory
         )
@@ -679,7 +679,6 @@ class UnoManager(GameManager):
             deck.append(UnoCard("Wild", "Wild"))
             deck.append(UnoCard("Wild", "Draw Four"))
         return deck
-
 
     def card_to_emoji(self, card):
         '''
