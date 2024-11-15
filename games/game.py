@@ -308,7 +308,7 @@ class GameManager():
             return False
         return True
 
-    async def add_player(self, interaction, user=None, init_player_data=None):
+    async def add_player(self, interaction, init_player_data=None, user=None):
         """
         Check whether a player can be added to the game in its current state, and if so,
         add them and associate them with init_player_data.

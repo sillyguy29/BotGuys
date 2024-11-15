@@ -83,6 +83,11 @@ class BlackJackAIPlayer(BlackjackPlayer):
     def choose_bet(self):
         return random.randint(0, self.chips)
 
+    def choose_hit_or_stand(self):
+        if random.randint(0, 1) == 0:
+            return False
+        return True
+
 
 class BlackjackGame(BaseGame):
     """

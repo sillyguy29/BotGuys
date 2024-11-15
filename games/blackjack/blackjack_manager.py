@@ -34,7 +34,7 @@ class BlackjackManager(GameManager):
                          gui_by_game_state=gui_by_game_state)
         self.cpu_names = ["Bob", "Bobby", "Bobert", "Bobette", "Joe"]
 
-    async def add_player(self, interaction, user=None, init_player_data=None):
+    async def add_player(self, interaction, init_player_data=None, user=None):
         init_player_data = Game.BlackjackPlayer()
         await super().add_player(interaction, init_player_data=init_player_data)
         if interaction.user in self.game.player_data \
@@ -83,6 +83,13 @@ class BlackjackManager(GameManager):
         # swap default GUI to betting phase buttons
         await self.invalidate_menu(1)
         await self.new_menu(4)
+        # let the cpus do their thing
+        await asyncio.sleep(5)
+        for player in self.game.turn_order:
+            if player.bot:
+                bet = self.game.player_data[player].choose_bet()
+                await self.make_bet(None, bet, user=player)
+                await asyncio.sleep(3)
 
     async def start_new_round(self, interaction):
         """
@@ -174,6 +181,17 @@ class BlackjackManager(GameManager):
         active_player_data.hand_value = value
         active_player_data.eleven_ace_count = eleven_aces
 
+        # handle bots
+        if active_player.bot:
+            await self.channel.send(f"{active_player.mention} is up!")
+            await asyncio.sleep(3)
+            choice = active_player_data.choose_hit_or_stand()
+            if choice:
+                await self.hit_user(None, active_player)
+            else:
+                await self.start_next_player_turn()
+            return
+
         # initiate the hit or stand menu
         hit_me_view = Views.HitOrStand(self, active_player)
         active_msg = await self.channel.send((f"{active_player.mention}, your turn! Your hand is\n"
@@ -210,7 +228,7 @@ class BlackjackManager(GameManager):
 
         return "Whoops, something went wrong, ignore this message."
 
-    async def hit_user(self, interaction):
+    async def hit_user(self, interaction, user=None):
         """
         Adds a card to the user's hand, and handles any consequences
         """
@@ -218,15 +236,18 @@ class BlackjackManager(GameManager):
         if await self.game_end_check(interaction):
             return
 
+        if user is None:
+            user = interaction.user
+
         # check to make sure they're in the game
-        if interaction.user not in self.game.player_data:
+        if user not in self.game.player_data:
             await send_info_message("You are not in this game.", interaction)
             return
 
         # note: we don't check to see if this is the player's turn,
         # so ensure that check is done before we get here
-        active_player = interaction.user
-        active_player_data = self.game.player_data[interaction.user]
+        active_player = user
+        active_player_data = self.game.player_data[user]
         new_card = STANDARD_52_DECK.draw(1)[0]
         active_player_data.hand.append(new_card)
         response_message = f"{active_player.mention} drew {cards_to_str_52_standard([new_card])}! "
@@ -252,13 +273,19 @@ class BlackjackManager(GameManager):
                 # is never overwritten even if the dealer busts too
                 response_message += "That's a bust!"
                 active_player_data.current_payout_multiplier = 0
-                await interaction.response.send_message(response_message)
+                if interaction is None:
+                    await self.channel.send(response_message)
+                else:
+                    await interaction.response.send_message(response_message)
                 await self.start_next_player_turn()
                 return
 
         if active_player_data.hand_value == 21:
             response_message += "That's 21!"
-            await interaction.response.send_message(response_message)
+            if interaction is None:
+                await self.channel.send(response_message)
+            else:
+                await interaction.response.send_message(response_message)
             await self.start_next_player_turn()
             return
 
@@ -266,15 +293,28 @@ class BlackjackManager(GameManager):
         response_message += (f"\nTheir hand is now "
                              f"{cards_to_str_52_standard(active_player_data.hand)}, "
                              f"which has a max value of {active_player_data.hand_value}!")
-        await interaction.response.send_message(response_message)
+        if interaction is None:
+            await self.channel.send(response_message)
+        else:
+            await interaction.response.send_message(response_message)
         await asyncio.sleep(2)
+
+        # handle bots
+        if active_player.bot:
+            choice = active_player_data.choose_hit_or_stand()
+            if choice:
+                await self.hit_user(None, active_player)
+            else:
+                await self.start_next_player_turn()
+            return
+
         hit_me_view = Views.HitOrStand(self, active_player)
         active_msg = await self.channel.send("What next?", view=hit_me_view)
         # wait for the buttons to be pressed and remove once one has
         await hit_me_view.wait()
         await active_msg.edit(view=await get_disabled_view(hit_me_view))
 
-    async def make_bet(self, interaction, bet_amount):
+    async def make_bet(self, interaction, bet_amount, user=None):
         """
         Set a player's bet
         """
@@ -282,8 +322,11 @@ class BlackjackManager(GameManager):
         if await self.game_end_check(interaction):
             return
 
+        # handle normal players, who do interactions
+        if user is None:
+            user = interaction.user
+
         # check to see if the user can bet, and deny them if not
-        user = interaction.user
         user_data = self.game.player_data[user]
         if user_data.current_bet != 0:
             await send_info_message("You've already bet this round.", interaction)
@@ -292,18 +335,19 @@ class BlackjackManager(GameManager):
             await send_info_message("You cannot afford this bet.", interaction)
             return
 
+        if interaction is not None:
         # double check to make sure the user wants to confirm this bet
-        (yes_clicked, interaction) = await double_check(interaction=interaction,
+            (yes_clicked, interaction) = await double_check(interaction=interaction,
                                                     message_content=f"Betting {str(bet_amount)}.")
-        if not yes_clicked:
-            await send_info_message("Cancelled bet!", interaction)
-            return
+            if not yes_clicked:
+                await send_info_message("Cancelled bet!", interaction)
+                return
         # perform the bet
         user_data.current_bet = int(bet_amount)
         user_data.chips -= int(bet_amount)
-        await interaction.channel.send((f"{user.mention} has bet {str(bet_amount)} "
-                                        f"chips and now has {str(user_data.chips)} "
-                                        "chips left!"))
+        await self.channel.send((f"{user.mention} has bet {str(bet_amount)} "
+                                 f"chips and now has {str(user_data.chips)} "
+                                  "chips left!"))
         self.game.betted_players += 1
         if self.game.players == self.game.betted_players:
             await self.deal_cards()
