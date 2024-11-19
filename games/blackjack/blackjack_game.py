@@ -108,6 +108,7 @@ class BlackjackGame(BaseGame):
         self.dealer_hidden_card = None
         self.turn_index = -1
         self.betted_players = 0
+        self.preferences_variables = None
 
     def get_active_player(self):
         """

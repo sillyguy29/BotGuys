@@ -17,7 +17,7 @@ class PokerPlayer(BasePlayer):
     Methods:
     1. get_debug_str: Returns a string representation of the player's debug information.
     """
-    def __init__(self, is_cpu=False):
+    def __init__(self):
         """
         Initializes a PokerPlayer object.
 
@@ -30,8 +30,7 @@ class PokerPlayer(BasePlayer):
         self.chips = 10000
         self.round_bet = 0
         self.total_bet = 0
-        self.is_cpu = is_cpu
-        self.active = True #Inactive when they fold
+        self.active = True # Inactive when they fold
 
     def get_debug_str(self):
         """
@@ -85,6 +84,7 @@ class PokerGame(BaseGame):
         self.turn_index = 0
         self.best_hand = []
         self.winner = {}
+        self.preferences_variables = None
 
     def get_debug_str(self):
         ret = super().get_debug_str()

@@ -47,6 +47,7 @@ class BlackjackManager(GameManager):
         if interaction.user not in self.game.player_data \
         and interaction.user in self.game.turn_order:
             self.game.turn_order.remove(interaction.user)
+            await self.refresh(interaction)
         # if nobody else is left, then quit the game
         if self.game.players == 0:
             await self.quit_game(interaction)
