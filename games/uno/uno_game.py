@@ -101,7 +101,6 @@ class UnoGame(BaseGame):
                 max_selected=9
             ),
             BooleanVariable("Reverse card repeats players turn",False),
-            BooleanVariable("Cannot play wild cards with matching color",False)
         ]
         self.preferences_variables = VariableStorage(preferences)
         """

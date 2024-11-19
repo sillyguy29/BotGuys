@@ -6,29 +6,21 @@ with the game at any time, and there is player management.
 """
 import random
 import discord
-from games.game import BaseGame
 from games.game import GameManager
 from games.uno.uno_card import UnoCard
 from games.uno.uno_game import UnoGame
 from games.uno.uno_player import UnoPlayer
 import games.uno.uno_views as Views
 
-from utils.variable_management.variable import IntegerVariable
-from utils.variable_management.variable import OptionVariable
-from utils.variable_management.variable import BooleanVariable
-from utils.variable_management.variable import OptionRepresentation
-from utils.variable_management.variable_storage import VariableStorage
-
-#TODO split views into separate file
 #TODO separate view for users who can affect it maybe
 #TODO implement dismissing preferences menu after game starts
-#TODO implement preferences behavior
 #TODO disable preferences button after game start
 #TODO show settings in join message
 #TODO single instance of preferences_gui view may cause issues with dynamic preference adding.
 #TODO setup rows for preferences menu to fix annoying ui element ordering
 #TODO implement effect stacking
 #TODO reimplement UNO from scratch to use new view system
+#TODO   write play_card, and next_turn methods
 
 class UnoManager(GameManager):
     '''
@@ -47,24 +39,16 @@ class UnoManager(GameManager):
         super().__init__(
             game=UnoGame(user_id),
             channel=channel,
-            factory=factory
+            factory=factory,
+            gui_by_game_state=gui_by_game_state
         )
-        self.prepare_preferences_quit_button()
+        self.prepare_preferences_menu()
 
-    def prepare_preferences_quit_button(self):
+    def prepare_preferences_menu(self):
         """
         Prepares the games preferences menu for 
         """
-        preferences_quit_button = discord.ui.Button(
-            style=discord.ButtonStyle.red,
-            label="Exit Settings",
-        )
-        async def quit_button_callback(interaction):
-            self.quick_log(f"{interaction.user} pressed {preferences_quit_button.label}!")
-            # start the game
-            await self.close_preferences_menu(interaction)
-        preferences_quit_button.callback = quit_button_callback
-        self.preferences_menu.add_ui_element(preferences_quit_button)
+        self.preferences_menu.add_ui_element(Views.PreferencesQuitButton(self))
         self.preferences_menu.add_menu_items()
 
     async def add_player(self, interaction, init_player_data=UnoPlayer()):
@@ -78,6 +62,8 @@ class UnoManager(GameManager):
         if interaction.user in self.game.player_data \
         and interaction.user not in self.game.turn_order:
             self.game.turn_order.append(interaction.user)
+        else:
+            self.quick_log("Something really weird happened in the uno add_player method")
 
     async def remove_player(self, interaction):
         '''
@@ -106,9 +92,23 @@ class UnoManager(GameManager):
         # game_state == 4 -> players cannot join or leave
         self.game.game_state = 4
         # swap default GUI to active game buttons
-        self.base_gui = Views.UnoButtonsBaseGame(self)
+        # legacy from pre game state based view system
+        #self.base_gui = Views.UnoButtonsBaseGame(self)
         # setup the game board
         await self.setup()
+        await self.resend(interaction)
+
+    async def start_new_round(self, interaction):
+        """
+        start_new_round: Reset the game state to player join phase.
+        """
+        self.quick_log("Starting a new round of Uno...")
+        for player in self.game.turn_order:
+            self.game.player_data[player].reset()
+        self.game.game_state = 1
+        # allow players to join
+        #pre game state dict code
+        #self.base_gui = UnoButtonsBase(self)
         await self.resend(interaction)
 
     def get_base_menu_string(self):
@@ -119,11 +119,12 @@ class UnoManager(GameManager):
         if self.game.game_state == 1:
             return "Welcome to this game of Uno. Feel free to join."
         elif self.game.game_state == 4:
-            output = f"Top Card: {self.card_to_emoji(self.game.top_card)} \n \
-                It's {self.game.turn_order[self.game.turn_index]} turn!"
+            output = f"Top Card: {self.card_to_emoji(self.game.top_card)} \n\
+                It's {current_turn_name}'s turn!\n\
+                {next_turn_name}"
             return output
         return "Game has started!"
-    
+
     async def announce(self, announcement):
         '''
         announce: This method is called whenever there is information that
@@ -137,6 +138,44 @@ class UnoManager(GameManager):
             delete_after=
             self.game.preferences_variables.get_value_of("Announcement lifetime"),
         )
+
+    async def setup(self):
+        '''
+        setup: Called before allowing the player to actually play a 
+        round of Uno. This method sets up the game state by populating
+        and shuffling the Uno deck, choosing an appropriate top card 
+        ("Reverse", "Skip", "Draw Two", and "Draw Four" cards are not 
+        considered appropriate to start the game), choosing a random 
+        player to start the game, and having each player draw 7 cards.
+        '''
+        self.quick_log("Setting up the game of Uno...")
+        # Create the deck
+        self.game.discard.clear()
+        self.game.deck = self.generate_deck()
+        random.shuffle(self.game.deck)
+        # Each player gets 7 cards to start
+        for i in self.game.player_data:
+            await self.draw_cards(self.game.player_data[i], 7)
+        # Assign the top-card. The game cannot begin on a "Reverse", "Skip", "Draw Two", or "Wild"
+        while True:
+            self.game.top_card = self.game.deck.pop()
+            top_card_is_invalid = False
+            match(self.game.top_card.value):
+                case "Reverse" | "Skip" | "Draw Two":
+                    top_card_is_invalid = True
+                case _:
+                    match(self.game.top_card.name):
+                        case "Wild":
+                            top_card_is_invalid = True
+            if top_card_is_invalid:
+                self.game.discard.append(self.game.top_card)
+                continue
+            else:
+                break
+        # Shuffle the ordering and select a random player to start the game
+        random.shuffle(self.game.turn_order)
+        #technically unnecessary but theres no harm in it
+        self.game.turn_index = random.randint(0, len(self.game.turn_order)-1)
 
     async def draw_cards(self, player, num_cards=1):
         '''
@@ -215,6 +254,74 @@ class UnoManager(GameManager):
                 return ":rainbow:"
             case _:
                 return "Unknown color, this should not appear."
+
+    def play_card(self, interaction_user, card):
+        pass
+
+    def get_playable_cards(self, player_data):
+        """
+        returns a list of the playable cards from the hand of some given player data
+        """
+        return [
+            card
+            for card in player_data.hand if
+            self.can_play_card(card)
+        ]
+
+    def can_play_card(self, card):
+        """
+        returns boolean for if the given card could be played on the top card
+        """
+        if len(self.game.queued_cards) == 0:
+            return self.can_play_left_on_right(card, self.game.top_card)
+        else:
+            return (
+                self.can_play_left_on_right(card, self.game.top_card) and
+                self.can_stack_effect_of_left_on_right(card, self.game.top_card)
+            )
+
+    def get_card_category(self, card):
+        """
+        finds the category string used in variable values for a given card
+        """
+        #card type and name to general name categories used in option values dictionary
+        #I am sorry and am on 5 hours of sleep, it is taking me 30 seconds to do 17-7.
+        card_to_category = {
+            ("Wild","Draw Four"): "plus_fours",
+        }
+        for color in ('Red', 'Yellow', 'Green', 'Blue'):
+            card_to_category[(color, "Draw Two")]= "plus_twos"
+            card_to_category[(color, "Skip")]= "effect_cards"
+            card_to_category[(color, "Reverse")]= "effect_cards"
+        if card not in card_to_category:
+            return None
+        return card_to_category[(card.name,card.value)]
+
+    def is_normal_card(self,card):
+        """
+        Simple check to see if card falls in the effect, plus two, or plus four card categories
+        """
+        return self.get_card_category(card) is None
+
+    def can_play_left_on_right(self, left, right):
+        """
+        returns boolean for if card suite or card name matches
+        """
+        return (
+            left.name == right.name or
+            left.value == right.value or
+            left.name == "Wild"
+        )
+
+    def can_stack_effect_of_left_on_right(self, left, right):
+        """
+        returns boolean for if a given card would be stackable on the last card in the queue of
+        cards to have their effects applied
+        """
+        return (
+            f"can_stack_{self.get_card_category(left)}_on_{self.get_card_category(right)}"
+            in self.game.variables.get_value_of("Stacking allowances")
+            ) and not self.is_normal_card(left)
 
     async def end_game(self, interaction):
         """
