@@ -10,9 +10,22 @@ from games.game import BaseGame
 from games.game import GameManager
 from games.game import BasePlayer
 from util import Card
+from utils.variable_management.variable import IntegerVariable
+from utils.variable_management.variable import OptionVariable
+from utils.variable_management.variable import BooleanVariable
+from utils.variable_management.variable import OptionRepresentation
+from utils.variable_management.variable_storage import VariableStorage
 
-
-
+#TODO split views into separate file
+#TODO separate view for users who can affect it maybe
+#TODO implement dismissing preferences menu after game starts
+#TODO implement preferences behavior
+#TODO disable preferences button after game start
+#TODO show settings in join message
+#TODO single instance of preferences_gui view may cause issues with dynamic preference adding.
+#TODO setup rows for preferences menu to fix annoying ui element ordering
+#TODO implement effect stacking
+#TODO reimplement UNO from scratch to use new view system
 class UnoPlayer(BasePlayer):
     """
     Represents an player of the uno game. Extended from the BasePlayer
@@ -33,15 +46,102 @@ class UnoPlayer(BasePlayer):
         self.skipped = False
         self.active_interaction = None
 
-    def get_playable_cards(self, top_card):
+    def get_card_category(self,card):
+        """
+        finds the category string used in variable values for a given card
+        """
+        #card type and name to general name categories used in option values dictionary
+        #I am sorry and am on 5 hours of sleep, it is taking me 30 seconds to do 17-7.
+        opt_val = {
+            ("Wild","Draw Four"): "plus_fours",
+        }
+        for color in ('Red', 'Yellow', 'Green', 'Blue'):
+            opt_val[(color, "Draw Two")]= "plus_twos"
+            opt_val[(color, "Skip")]= "effect_cards"
+            opt_val[(color, "Reverse")]= "effect_cards"
+        if card not in opt_val:
+            return None
+        return opt_val[(card.name,card.value)]
+
+    def is_normal_card(self,card):
+        """
+        Simple check to see if card falls in the effect, plus two, or plus four card categories
+        """
+        return self.get_card_category(card) is None
+
+    def get_playable_cards(self, top_card, variables):
         """
         Used by the button menu to determine which cards can be
         enabled.
         """
-        playable_cards = [card for card in self.hand if card.name == top_card.name \
-            or card.value == top_card.value or card.name == "Wild" ]
+        playable_cards = [
+            card
+            for card in
+            self.hand
+            if
+            card.name == top_card.name or
+            card.value == top_card.value or
+            (
+                card.name == "Wild" and
+                (
+                    not variables.get_value_of(
+                    "Cannot play wild cards with matching color"
+                    ) or
+                    top_card.name not in [c.name for c in self.hand]
+                )
+            )
+        ]
         return playable_cards
+    
+    def is_stackable_card(self, card, variables, queue_card):
+        #I would indent better here but the linter settings disallow lines that are longer than 100
+        #characters
+        return (f"can_stack_{self.get_card_category(card)}_on_{self.get_card_category(queue_card)}"
+            in variables.get_value_of("Stacking allowances")
+            ) and not self.is_normal_card(card)
 
+    def get_stackable_playable_cards(self, top_card, variables, queued_cards):
+        """
+        returns a list of the playable and stackable cards, used to replace playable cards deck
+        if the player is the target of the card queue
+        """
+        try:
+            queue_card = queued_cards[-1] #last queued card
+        except IndexError:
+            print("This should never happen, someone's not checking queued_cards before this")
+
+        stackable_cards = [
+            card
+            for card in
+            self.get_playable_cards(top_card,variables)
+            if self.is_stackable_card(card, variables, queue_card)
+        ]
+        return stackable_cards
+
+    def has_stackable_playable_cards(self, top_card, variables, queued_cards):
+        """
+        returns a boolean for if the player has any playable cards that could be stacked on
+        the top card based on the current preferences.
+        """
+        return len(self.get_stackable_playable_cards(top_card, variables, queued_cards)) > 0
+
+    def has_playable_cards(self, top_card, variables):
+        """
+        returns a boolean value for if the player has cards that could, without accounting for
+        effects applied, be played on the top card  based on the current preferences.
+        """
+        return len(self.get_playable_cards(top_card,variables)) > 0
+
+    def should_be_skipped(self, top_card, variables, queued_cards):
+        """
+        returns a boolean value for if the player has cards that can be played based upon
+        whether or not there are stacked effects waiting and what cards they have available
+        to play.
+        """
+        queued_card_effects = [self.get_card_category for card in queued_cards]
+        return (len(queued_cards) > 0
+            and self.has_stackable_playable_cards(top_card, variables, queued_cards)
+            and any(x in queued_card_effects for x in ["plus_twos", "plus_fours"]))
 
 class UnoGame(BaseGame):
     """
@@ -62,9 +162,9 @@ class UnoGame(BaseGame):
            the middle of the table that the players need to match
            color or value.
     """
-    def __init__(self):
+    def __init__(self, user_id):
         # game state 1 -> accepting players but not playing yet
-        super().__init__(game_type=3, player_data={}, game_state=1)
+        super().__init__(game_type=3, player_data={}, game_state=1, user_id=user_id)
 
         self.deck = []
         self.discard = []
@@ -72,33 +172,112 @@ class UnoGame(BaseGame):
         self.turn_index = 0
         self.reversed = False
         self.top_card = UnoCard("None", "")
-
+        self.queued_cards = []
+        #defines the variables for use and display
+        preferences = [
+            IntegerVariable("Drawn card show time", 5, range_min=0, range_max=20),
+            IntegerVariable("Announcement lifetime", 0, range_min=0, range_max=20),
+            OptionVariable(
+                name="Stacking allowances",
+                default_value=[
+                    "can_stack_effect_cards_on_effect_cards",
+                    "can_stack_plus_twos_on_effect_cards",
+                    "can_stack_plus_fours_on_effect_cards",
+                    "can_stack_effect_cards_on_plus_twos_cards",
+                    "can_stack_plus_twos_on_plus_twos_cards",
+                    "can_stack_plus_fours_on_plus_twos_cards",
+                    "can_stack_effect_cards_on_plus_fours_cards",
+                    "can_stack_plus_twos_on_plus_fours_cards",
+                    "can_stack_plus_fours_on_plus_fours_cards"
+                ],
+                options=[
+                    OptionRepresentation(
+                        "Can stack effect cards on other effect cards",
+                        "can_stack_effect_cards_on_effect_cards"
+                    ),
+                    OptionRepresentation(
+                        "Can stack plus twos on effect cards",
+                        "can_stack_plus_twos_on_effect_cards"
+                    ),
+                    OptionRepresentation(
+                        "Can stack plus fours on effect cards",
+                        "can_stack_plus_fours_on_effect_cards"
+                    ),
+                    OptionRepresentation(
+                        "Can stack effect cards on plus twos",
+                        "can_stack_effect_cards_on_plus_twos"
+                    ),
+                    OptionRepresentation(
+                        "Can stack plus twos on other plus twos",
+                        "can_stack_plus_twos_on_effect_cards"
+                    ),
+                    OptionRepresentation(
+                        "Can stack plus fours on plus twos",
+                        "can_stack_plus_fours_on_plus_twos"
+                    ),
+                    OptionRepresentation(
+                        "Can stack effect cards on plus fours",
+                        "can_stack_effect_cards_on_plus_fours"
+                    ),
+                    OptionRepresentation(
+                        "Can stack plus twos on other plus fours",
+                        "can_stack_plus_twos_on_effect_fours"
+                    ),
+                    OptionRepresentation(
+                        "Can stack plus fours on other plus fours",
+                        "can_stack_plus_fours_on_plus_fours"
+                    ),
+                ],
+                min_selected=0,
+                max_selected=9
+            ),
+            BooleanVariable("Reverse card repeats players turn",False),
+#unimplemented            BooleanVariable("Can callout Uno",False),
+            BooleanVariable("Cannot play wild cards with matching color",False)
+        ]
+        self.preferences_variables = VariableStorage(preferences)
+        """
+        self.drawn_card_show_time = 5
+        self.make_deck_time = 0
+        self.can_stack_effect_cards_on_effect_cards = True
+        self.can_stack_plus_fours_on_effect_cards = True
+        self.can_stack_effect_cards_on_plus_fours = True
+        self.can_stack_plus_fours_on_plus_fours = True
+        self.reverse_card_repeats_players_turn = False
+        self.can_callout_uno = False
+        self.only_play_plus_fours_without_matching_color = False
+        """
 
 class UnoManager(GameManager):
     '''
     Uno game model class that controls the flow of Uno by interacting
     and modifying its UnoGame property and updating its base GUI to
-    receive input from the players. A brief overview of its methods:
-    1. add_player: adds player to the game
-    2. remove_player: removes player from the game
-    3. start_game: proceeds to game setup
-    4. get_base_menu_string: gets current game message
-    5. start_new_round: return to "player join" phase
-    6. setup: Sets up the table and players' hands
-    7. draw_cards: Gives player cards from the deck
-    8. regenerate_deck: Replenishes the deck when its empty
-    9. get_player_hand: Handy getter of a player's hand
-    10. update_turn_index: Increment or decrement turn index
-    11. get_next_turn_index: Tells what the current turn index is
-    12. play_card: Handles events of playing a card
-    13. next_turn: Update turn index, skipping 'skipped' players
-    14. announce: Gives each player important information
-    15. card_to_emoji: Returns emoji of a card (colon-flanked-text)
-    16. color_to_emoji: Returns emoji of a card (actual-emoji)
+    receive input from the players.
     '''
-    def __init__(self, factory, channel):
-        super().__init__(game=UnoGame(), base_gui=UnoButtonsBase(self),
-                         channel=channel, factory=factory, preferences_gui=UnoButtonsPreferences(self))
+    def __init__(self, factory, channel, user_id=None):
+
+        super().__init__(
+            game=UnoGame(user_id),
+            channel=channel,
+            factory=factory
+        )
+        self.prepare_preferences_quit_button()
+
+    def prepare_preferences_quit_button(self):
+        """
+        Prepares the games preferences menu for 
+        """
+        preferences_quit_button = discord.ui.Button(
+            style=discord.ButtonStyle.red,
+            label="Exit Settings",
+        )
+        async def quit_button_callback(interaction):
+            self.quick_log(f"{interaction.user} pressed {preferences_quit_button.label}!")
+            # start the game
+            await self.close_preferences_menu(interaction)
+        preferences_quit_button.callback = quit_button_callback
+        self.preferences_menu.add_ui_element(preferences_quit_button)
+        self.preferences_menu.add_menu_items()
 
     async def add_player(self, interaction, init_player_data=UnoPlayer()):
         '''
@@ -112,21 +291,49 @@ class UnoManager(GameManager):
         and interaction.user not in self.game.turn_order:
             self.game.turn_order.append(interaction.user)
 
-    async def preferences_menu(self, interaction):
+    async def bring_up_preferences_menu(self, interaction):
         """
         This is the uno manager call for preferences menu
-        If the user that called for the preferences menu is currently in the game,
-        or does not already has a settings menu open and game has not started
+        If the user that called for the preferences menu is the one who called the
+        uno command and is currently in the game and game has not started
         send an ephemeral message to the person who called for the preferences menu
-        a message which contains the submenu for selecting Uno Settings until
-        the user dismisses it or the game starts, otherwise do nothing.
+        which contains the submenu for selecting Uno Settings. Otherwise send a failure
+        message mentioning one of these requirements. The preferences menu will stay until
+        the user dismisses it or the game starts.
         """
-        #TODO implement dismissing after game starts
-        #TODO implement actual settings menu
-        if interaction.user in self.game.player_data and interaction.user in self.game.turn_order:
-            await interaction.response.send_message(content=self.get_base_menu_string(),
-                view=self.preferences_gui, silent=True, ephemeral=True, delete_after=2)
-            
+        if  self.game.game_state != 4 and \
+            interaction.user in self.game.player_data and \
+            interaction.user in self.game.turn_order and \
+            interaction.user.id == self.game.user_id:
+            await interaction.response.send_message(
+                content="",
+                view=self.preferences_menu.get_view(),
+                silent=True,
+                ephemeral=True,
+                delete_after=60
+            )
+        elif interaction.user.id != self.game.user_id:
+            await interaction.response.send_message(
+                content="You are not the creator of this game.",
+                silent=True,
+                ephemeral=True,
+                delete_after=5
+            )
+        elif interaction.user not in self.game.player_data:
+            await interaction.response.send_message(
+                content="You have not yet joined the game.",
+                silent=True,
+                ephemeral=True,
+                delete_after=5
+            )
+        elif interaction.user in self.game.turn_order:
+            await interaction.response.send_message(
+                content="You have not yet joined the game.",
+                silent=True,
+                ephemeral=True,
+                delete_after=5
+            )
+
     async def remove_player(self, interaction):
         '''
         remove_player: Called when a user presses the "Quit" button.
@@ -304,10 +511,10 @@ class UnoManager(GameManager):
 
     async def play_card(self, interaction, card):
         '''
-        play_card: This method is called when a player presses a 
+        play_card: This method is called when a player presses a
         button corresponding to a card in their hand. It takes the
         interaction and the corresponding card as arguments. The top card 
-        is replaced with that card (unless the card is Wild, then we do 
+        is replaced with that card (unless the card is Wild, then we do
         it differently). Then, depending on the card, this method branches 
         off into different cases: 
             a. "Wild": Prompt the player to choose a color by giving
@@ -349,23 +556,29 @@ class UnoManager(GameManager):
         # If "Reverse" card was played, reverse the queue
         if card.value == "Reverse":
             self.game.reversed = not self.game.reversed
+            self.game.queued_cards.append(card)
+            if not self.game.preferences_variables.get_value_of(
+                    "Reverse card repeats players turn"
+                ):
+                self.update_turn_index()
             await self.announce("Reversing the turn order!")
         # If "Skip" was played, flag them as 'skipped'
         if card.value == "Skip":
+            self.game.queued_cards.append(card)
             await self.announce(victim_name + " got skipped! LOL!")
             victim_unoplayer.skipped = True
         # If "Draw Two" was played, make next player draw two cards
         #    and then flag them as 'skipped'
         if card.value == "Draw Two":
-            await self.announce(victim_name + " eats two cards! LMAO!")
-            await self.draw_cards(victim_unoplayer, 2)
-            victim_unoplayer.skipped = True
+            self.game.queued_cards.append(card)
+            #await self.announce(victim_name + " eats two cards! LMAO!")
+            #await self.draw_cards(victim_unoplayer, 2)
         # If "Draw Four" was played, make next player draw four cards
         #    and then flag them as 'skipped'
         if card.value == "Draw Four":
-            await self.announce(victim_name + " eats four cards! ROFL!!")
-            await self.draw_cards(victim_unoplayer, 4)
-            victim_unoplayer.skipped = True
+            self.game.queued_cards.append(card)
+            #await self.announce(victim_name + " eats four cards! ROFL!!")
+            #await self.draw_cards(victim_unoplayer, 4)
         # Remove the played card from the player's hand
         player = self.game.player_data[interaction.user]
         player.hand.remove(card)
@@ -377,7 +590,6 @@ class UnoManager(GameManager):
             return
         # Go to next turn
         await self.next_turn()
-
 
     async def next_turn(self):
         '''
@@ -393,14 +605,40 @@ class UnoManager(GameManager):
 
         # Check if player is skipped. If so, move on to the next player
         next_player = self.game.player_data[self.game.turn_order[self.game.turn_index]]
-        while next_player.skipped:
+        while next_player.skipped or next_player.should_be_skipped(
+                self.game.top_card,
+                self.game.preferences_variables,
+                self.game.queued_cards
+            ):
             next_player.skipped = False
+            if (next_player.should_be_skipped(
+                self.game.top_card,
+                self.game.preferences_variables,
+                self.game.queued_cards
+            ) and not next_player.skipped):
+                #skipped due to contents of queue
+                #contents should be applied
+                await self.apply_queued_effects(self.game.turn_index)
             self.update_turn_index()
             next_player = self.game.player_data[self.game.turn_order[self.game.turn_index]]
 
         # Refresh the base GUI
         await self.current_active_menu.edit(content=self.get_base_menu_string(),
                                             view=self.base_gui)
+    async def apply_queued_effects(self,victim_index):
+        """
+        Iterates through the stacked cards and applies them to the unfortunate fellow.
+        """
+        victim_user = self.game.turn_order[victim_index]
+        victim_name = victim_user.display_name
+        victim_unoplayer = self.game.player_data[victim_user]
+        for card in self.game.queued_cards:
+            if card.value == "Draw Two":
+                await self.announce(victim_name + " eats two cards! LMAO!")
+                await self.draw_cards(victim_unoplayer, 2)
+            if card.value == "Draw Four":
+                await self.announce(victim_name + " eats four cards! ROFL!!")
+                await self.draw_cards(victim_unoplayer, 4)
 
     async def announce(self, announcement):
         '''
@@ -411,7 +649,10 @@ class UnoManager(GameManager):
             c. Player has 1 card remaining in hand.
             d. Player won.
         '''
-        await self.channel.send(announcement, delete_after=3)
+        await self.channel.send(announcement,
+            delete_after=
+            self.game.preferences_variables.get_value_of("Announcement lifetime"),
+        )
 
     def generate_deck(self):
         '''
@@ -438,7 +679,6 @@ class UnoManager(GameManager):
             deck.append(UnoCard("Wild", "Wild"))
             deck.append(UnoCard("Wild", "Draw Four"))
         return deck
-
 
     def card_to_emoji(self, card):
         '''
@@ -532,8 +772,7 @@ class UnoButtonsBase(discord.ui.View):
         the user dismisses it or the game starts or ends, otherwise do nothing.
         """
         self.manager.quick_log(f"{interaction.user} pressed {button.label}")
-        await self.manager.preferences_menu(interaction)
-
+        await self.manager.bring_up_preferences_menu(interaction)
 
     @discord.ui.button(label = "Quit", style = discord.ButtonStyle.red)
     async def quit(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -566,18 +805,17 @@ class UnoButtonsPreferences(discord.ui.View):
         self.manager = manager
         self.disabled_view = None
 
-    @discord.ui.button(label = "Placeholder button", style = discord.ButtonStyle.blurple)
-    async def start(self, interaction: discord.Interaction, button: discord.ui.Button):
+    @discord.ui.button(label = "Exit Settings", style = discord.ButtonStyle.red)
+    async def exit(self, interaction: discord.Interaction, button: discord.ui.Button):
         """
-        A place holder button for use until the uno preferences menu has actual settings management implemented.
+        A place holder button for use until the uno preferences menu has actual
+        settings management implemented.
         """
         # print when someone presses the button because otherwise
         # pylint won't shut up about button being unused
         self.manager.quick_log(f"{interaction.user} pressed {button.label}!")
         # start the game
-        #await self.manager.start_game(interaction)
-
-
+        await self.manager.close_preferences_menu(interaction)
 
 class UnoButtonsBaseGame(discord.ui.View):
     """
@@ -643,14 +881,14 @@ class UnoButtonsBaseGame(discord.ui.View):
         card_drawn = await self.manager.draw_cards(player)
         msg = button.label + "! You drew a " + self.manager.color_to_emoji(card_drawn) \
             + " " + card_drawn.value
-        await interaction.response.send_message(msg, ephemeral = True, delete_after = 2)
+        await interaction.response.send_message(msg, ephemeral = True,
+            delete_after =
+            self.manager.game.preferences_variables.get_value_of("Drawn card show time")
+        )
 
         # Announce that player has opted to draw a card and proceed to next turn
         await self.manager.announce(str(interaction.user) + " is drawing a card...")
         await self.manager.next_turn()
-
-
-
 
 class UnoCardButtons(discord.ui.View):
     """
@@ -665,9 +903,24 @@ class UnoCardButtons(discord.ui.View):
         for card in self.player_hand:
             current_turn_player = self.manager.game.turn_order[self.manager.game.turn_index]
             uno_player = self.manager.game.player_data[player]
-            playable_cards = uno_player.get_playable_cards(self.manager.game.top_card)
-            disabled = (player != current_turn_player) or (card not in playable_cards)
-            self.add_item(CardButton(self.manager, card, disabled))
+            if len(self.manager.game.queued_cards) > 0:
+                #only allowed stackable cards
+                playable_cards = uno_player.get_stackable_playable_cards(
+                    self.manager.game.top_card,
+                    self.manager.game.preferences_variables
+                )
+            else:
+                #allowed any playable card
+                playable_cards = uno_player.get_playable_cards(
+                    self.manager.game.top_card,
+                    self.manager.game.preferences_variables
+                )
+
+            disabled = (
+                player != current_turn_player) or (
+                card not in playable_cards)
+            if(len(self.children) != 25):
+                self.add_item(CardButton(self.manager, card, disabled))
 
 
 
@@ -777,39 +1030,6 @@ class UnoCard(Card):
     This class represents an Uno card. On construction, it uses its
     name and value to establish a priority, used for sorting in a list.
     """
-    def __init__(self, name, value):
-        super().__init__(name, value)
-        
-        #This code is likely no longer necessary, however until further testing is performed it may need to be reverted to
-        """
-        self.priority = 0
-        if self.name == "Red":
-            self.priority += 0
-        if self.name == "Blue":
-            self.priority += 15
-        if self.name == "Green":
-            self.priority += 30
-        if self.name == "Yellow":
-            self.priority += 45
-        if self.name == "Wild":
-            self.priority += 60
-
-        if self.value == "Reverse":
-            self.priority += 11
-        elif self.value == "Skip":
-            self.priority += 12
-        elif self.value == "Draw Two":
-            self.priority += 13
-        elif self.value == "Card":
-            self.priority += 1
-        elif self.value == "Draw Four":
-            self.priority += 2
-        elif self.value == "Wild":
-            self.priority += 0
-        elif self.value == "":
-            self.priority += 0
-        else: self.priority += int(self.value)
-        """
 
     def __str__(self):
         return f"{self.name} {self.value}"

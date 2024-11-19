@@ -13,6 +13,9 @@ GAME STATES BREAKDOWN:
 import logging
 import discord
 from util import send_info_message, get_disabled_view
+from utils.variable_management.variable_menu import VariableMenu
+
+# TODO fix self.game.preferences_variables issue
 
 class AIUser():
     """
@@ -131,9 +134,8 @@ class GameManager():
         # reference to the message that currently contains the base menu. Needed so that the
         # bot can remove the buttons from it or edit its contents at any time
         self.current_active_menu = None
-        # preferences menu layout
-        self.preferences_gui = preferences_gui
         self.gui_by_game_state = gui_by_game_state
+        self.preferences_menu = VariableMenu(self.game.preferences_variables)
 
     async def create_game(self, interaction):
         """
@@ -240,14 +242,23 @@ class GameManager():
                                                                view=None, silent=True)
         self.quick_log("Base menu resent")
 
-    async def preferences_menu(self, interaction):
+
+    async def bring_up_preferences_menu(self, interaction):
         """
         This is the Game manager call for preferences menu
         it should almost certainly not have been called.
         """
-        self.quick_log("preferences_menu in GameManager called.")
+        self.quick_log(f"brought up preferences menu for {interaction.user}")
         await interaction.response.send_message(content="No preferences menu for this game.",
             silent=True, ephemeral=True, delete_after=2)
+
+    async def close_preferences_menu(self, interaction):
+        """
+        This method will close the preferences menu currently shown to the user,
+        it should only be called from the preferences menu's quit button.
+        """
+        self.quick_log(f"removing preferences menu for {interaction.user}")
+        await interaction.response.edit_message(content="Cancelled", view=None, delete_after=0)
 
     async def quit_game(self, interaction):
         """
@@ -432,7 +443,7 @@ class GameManager():
         Returns a string with all members of the class for debug
         """
         return ("Base manager:\n"
-                f"\tbase_gui: {self.base_gui}\n"
+                f"\tbase_gui: {self.gui_by_game_state}\n"
                 f"\tchannel id: {self.channel.id}\n" + self.game.get_debug_str())
 
     def quick_log(self, content, interaction=None, level=logging.DEBUG):

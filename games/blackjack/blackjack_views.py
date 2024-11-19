@@ -45,7 +45,6 @@ class QuitGameButton(discord.ui.View):
         await interaction.channel.send(f"{interaction.user.mention} ended the game!")
         await self.manager.quit_game(interaction)
 
-
 class BlackjackButtonsBase(discord.ui.View):
     """
     Initial "join game" buttons
