@@ -81,9 +81,15 @@ class BlackJackAIPlayer(BlackjackPlayer):
         self.controller = controller
 
     def choose_bet(self):
+        """
+        Chooses the bet during the betting phase
+        """
         return random.randint(0, self.chips)
 
     def choose_hit_or_stand(self):
+        """
+        Chooses whether to hit or stand in the hit or stand phase
+        """
         if random.randint(0, 1) == 0:
             return False
         return True

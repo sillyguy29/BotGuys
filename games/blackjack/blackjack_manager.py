@@ -189,6 +189,7 @@ class BlackjackManager(GameManager):
             if choice:
                 await self.hit_user(None, active_player)
             else:
+                await self.channel.send(f"{active_player.mention} has decided to stand!")
                 await self.start_next_player_turn()
             return
 
@@ -305,6 +306,7 @@ class BlackjackManager(GameManager):
             if choice:
                 await self.hit_user(None, active_player)
             else:
+                await self.channel.send(f"{active_player.mention} has decided to stand!")
                 await self.start_next_player_turn()
             return
 

@@ -19,6 +19,9 @@ class QuitGameButton(discord.ui.View):
         """
         Start a new round
         """
+        if not self.manager.user_in_game(interaction.user):
+            await send_info_message("You are not in this game.", interaction)
+            return
         # print when someone presses the button because otherwise
         # pylint won't shut up about button being unused
         print(f"{interaction.user} pressed {button.label}!")
@@ -31,6 +34,9 @@ class QuitGameButton(discord.ui.View):
         """
         Quit the game
         """
+        if not self.manager.user_in_game(interaction.user):
+            await send_info_message("You are not in this game.", interaction)
+            return
         # print when someone presses the button because otherwise
         # pylint won't shut up about button being unused
         print(f"{interaction.user} pressed {button.label}!")
@@ -72,6 +78,9 @@ class BlackjackButtonsBase(discord.ui.View):
         """
         Quit the game
         """
+        if not self.manager.user_in_game(interaction.user):
+            await send_info_message("You are not in this game.", interaction)
+            return
         # print when someone presses the button because otherwise
         # pylint won't shut up about button being unused
         print(f"{interaction.user} pressed {button.label}!")
@@ -83,6 +92,9 @@ class BlackjackButtonsBase(discord.ui.View):
         """
         Start the game
         """
+        if not self.manager.user_in_game(interaction.user):
+            await send_info_message("You are not in this game.", interaction)
+            return
         # print when someone presses the button because otherwise
         # pylint won't shut up about button being unused
         print(f"{interaction.user} pressed {button.label}!")
