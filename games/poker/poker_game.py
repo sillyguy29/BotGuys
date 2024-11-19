@@ -46,6 +46,17 @@ class PokerPlayer(BasePlayer):
                 f"\t\ttotal_bet: {self.total_bet}\n"
                 f"\t\tactive: {self.active}\n")
 
+class PokerAIPlayer(PokerPlayer):
+    """
+    Contains AI functions
+    """
+    def __init__(self, name, ai_type=0, controller=None):
+        super().__init__()
+
+        self.ai_type = ai_type
+        self.controller = controller
+
+
 class PokerGame(BaseGame):
     """
     Represents a game of poker.

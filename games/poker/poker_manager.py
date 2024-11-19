@@ -12,9 +12,8 @@ from itertools import combinations
 import discord
 import games.poker.poker_game as Game
 import games.poker.poker_views as Views
-from games.game import BaseGame
 from games.game import GameManager
-from games.game import BasePlayer
+from games.game import AIUser
 from util import double_check
 from util import STANDARD_52_DECK
 from util import cards_to_str_52_standard
@@ -43,8 +42,9 @@ class PokerManager(GameManager):
         gui_by_game_state = {0: None, 1: Views.PokerButtonsBase(self)}
         super().__init__(game=Game.PokerGame(cpus), channel=channel, factory=factory,
                          gui_by_game_state=gui_by_game_state)
+        self.cpu_names = ["Bob", "Bobby", "Bobert", "Bobette", "Joe"]
 
-    async def add_player(self, interaction, init_player_data=None):
+    async def add_player(self, interaction, init_player_data=None, user=None):
         """
         Adds a player to the game and updates the turn order if necessary.
         """
@@ -65,6 +65,23 @@ class PokerManager(GameManager):
         # if nobody else is left, then quit the game
         if self.game.players == 0:
             await self.quit_game(interaction)
+
+    async def add_cpu(self, ai_type, interaction):
+        """
+        Adds a cpu player to the game
+        """
+        # select a CPU name
+        if len(self.cpu_names) == 0:
+            await send_info_message("Max CPU players already reached.", interaction)
+            return
+        name = random.choice(self.cpu_names)
+        self.cpu_names.remove(name)
+        user = AIUser(name)
+        init_cpu_data = Game.PokerAIPlayer(name=name, ai_type=ai_type,
+                                               controller=interaction.user)
+        await super().add_player(interaction, user=user, init_player_data=init_cpu_data)
+        self.game.turn_order.append(user)
+        await self.refresh(interaction)
 
     async def start_game(self, interaction):
         """
