@@ -152,7 +152,7 @@ class BlackjackManager(GameManager):
 
     async def start_next_player_turn(self):
         """
-        Start the next player's turn
+        Start the next player's turn. Used when a player busts, hits 21, or decides to stand
         """
         self.game.turn_index += 1
         # if we made it to the end of the list, have the dealer go
@@ -232,7 +232,9 @@ class BlackjackManager(GameManager):
 
     async def hit_user(self, interaction, user=None):
         """
-        Adds a card to the user's hand, and handles any consequences
+        Adds a card to the user's hand, and handles any consequences. The user param
+        should be set to none if the user trying to perform this action is a human player
+        (not a cpu player)
         """
         # check to make sure the game hasn't ended, do nothing if it has
         if await self.game_end_check(interaction):
@@ -319,7 +321,8 @@ class BlackjackManager(GameManager):
 
     async def make_bet(self, interaction, bet_amount, user=None):
         """
-        Set a player's bet
+        Set a player's bet. The user param should be set to none if the user trying
+        to perform this action is a human player (not a cpu player)
         """
         # checks to see if the game is over
         if await self.game_end_check(interaction):

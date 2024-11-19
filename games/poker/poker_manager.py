@@ -53,6 +53,7 @@ class PokerManager(GameManager):
         if interaction.user in self.game.player_data \
         and interaction.user not in self.game.turn_order:
             self.game.turn_order.append(interaction.user)
+            await self.refresh(interaction)
 
     async def remove_player(self, interaction):
         """
@@ -62,6 +63,7 @@ class PokerManager(GameManager):
         if interaction.user not in self.game.player_data \
         and interaction.user in self.game.turn_order:
             self.game.turn_order.remove(interaction.user)
+            await self.refresh(interaction)
         # if nobody else is left, then quit the game
         if self.game.players == 0:
             await self.quit_game(interaction)
@@ -231,7 +233,10 @@ class PokerManager(GameManager):
         Returns a string representation of the base menu.
         """
         if self.game.game_state == 1:
-            return "Who's ready for a game of poker?"
+            ret = "Who's ready for a game of poker?\nCurrent Players:"
+            for player in self.game.turn_order:
+                ret = ret + f"\n\t{player.display_name}"
+            return ret
 
         if self.game.game_state == 4:
             ret = "Current bets and chips:\n"
