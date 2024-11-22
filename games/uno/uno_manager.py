@@ -120,8 +120,8 @@ class UnoManager(GameManager):
             return "Welcome to this game of Uno. Feel free to join."
         elif self.game.game_state == 4:
             output = f"Top Card: {self.card_to_emoji(self.game.top_card)} \n\
-                It's {current_turn_name}'s turn!\n\
-                {next_turn_name}"
+                It's {self.get_current_turn_user}'s turn\n\
+                and {self.get_next_turn_user}'s turn next!"
             return output
         return "Game has started!"
 
@@ -255,8 +255,122 @@ class UnoManager(GameManager):
             case _:
                 return "Unknown color, this should not appear."
 
-    def play_card(self, interaction_user, card):
-        pass
+    async def play_card(self, interaction, card):
+        """
+        method handles figuring out what card has been played and what needs to be done
+        """
+        # We put add the top card to the discard pile,
+        # but only if it's not a placeholder card
+        if self.game.top_card.value != "Card":
+            self.game.discard.append(self.game.top_card)
+        if card.name == "Wild":
+            view = Views.UnoWildCard(self) # Menu to inquire what the next card is
+            await interaction.response.send_message("Choose a color!", view = view, \
+                ephemeral=True, delete_after=10)
+            await view.wait()
+            #view will make top_card a placeholder card with corresponding color on choice
+            #so just shove the wildcard directly into the discard pile as placeholder cards
+            #are not put into discard
+            self.game.discard.append(card)
+            await interaction.delete_original_response()
+        else: # Not wild, just replace
+            self.game.top_card = card
+
+        #after playing remove card from hand
+        player_hand = self.game.player_data[interaction.user].hand
+        player_hand.remove(card)
+
+        if not self.is_normal_card(card):
+            #I'll make this better after I make sure it works
+            match(card.value):
+                case "Draw Two" | "Draw Four" | "Reverse":
+                    self.game.queued_cards.append(card)
+                case "Skip":
+                    self.game.reversed = not self.game.reversed
+
+        match(len(player_hand)):
+            case 0:
+                await self.end_game(interaction)
+            case 1:
+                await self.announce("Oh fuck! " + interaction.user.display_name + \
+                    " has only one card left!")
+            case _:
+                await self.go_to_next_turn()
+
+    async def go_to_next_turn(self):
+        """
+        method changes turn_index to the index of the next player that can do anything
+        factoring in whether a player can use effect card stacking to avoid being skipped
+        """
+        #cleanup and merge first if and else
+        #if the has queued effect cards
+        if len(self.game.queued_cards) > 0 and self.get_playable_cards(self.get_next_turn_hand()):
+            #and if the player has cards they can play to avoid being skippped then stop on them
+            self.game.turn_index = self.get_next_turn_number()
+        elif len(self.game.queued_cards) > 0:
+            #if the player does not have cards they can play then make it their turn
+            self.game.turn_index = self.get_next_turn_number()
+            #apply the effects of the queued cards (which will result in the player being skipped)
+            self.apply_queued_cards()
+            #and skip the player
+            self.game.turn_index = self.get_next_turn_number()
+        else:
+            self.game.turn_index = self.get_next_turn_number()
+
+    def apply_queued_cards(self):
+        """
+        Apply the effects of all the queued cards in self.game.queued_cards and then
+        clear the queue
+        For the moment reverse cards have their effect applied immediately and cannot be queued
+        so they are not applied in this method.
+        This method is only intended to be used if the player is already being skipped so the
+        skip card while it is queued does not get applied.
+        """
+        for card in self.game.queued_cards:
+            match(card.value):
+                case "Draw Two":
+                    self.draw_cards(self.get_current_turn_player_data(), 2)
+                case "Draw Four":
+                    self.draw_cards(self.get_current_turn_player_data(), 4)
+                case "Skip" | _:
+                    pass
+        self.game.queued_cards = []
+
+    def get_next_turn_hand(self):
+        """
+        Method returns the hand of the user returned get get_next_turn_user
+        """
+        return self.game.player_data[self.get_next_turn_user()].hand
+
+    def get_current_turn_player_data(self):
+        """
+        Method returns the player_data (i.e. the UnoPlayer class) of the current turn's user
+        """
+        return self.game.player_data[self.game.turn_order[self.game.turn_index]]
+
+    def get_current_turn_user(self):
+        """
+        Method returns the discord user object of the current turn
+        """
+        return self.game.turn_order[self.game.turn_index]
+
+    def get_next_turn_user(self):
+        """
+        Method returns the discord user object of the next player in the turn order.
+        Does not factor in stacking or card effects other than whether the game is
+        currently in a reversed state
+        """
+        return self.game.turn_order[self.get_next_turn_number()]
+
+    def get_next_turn_number(self):
+        """
+        Method returns the next index in the turn order. Does not factor in stacking or card
+        effects other than whether the game is currently in a reversed state
+        """
+        if self.game.reversed:
+            return (self.game.turn_index-1)%len(self.game.turn_order)
+        else:
+            return (self.game.turn_index+1)%len(self.game.turn_order)
 
     def get_playable_cards(self, player_data):
         """
