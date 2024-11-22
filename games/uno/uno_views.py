@@ -162,30 +162,31 @@ class UnoCardButtons(discord.ui.View):
     def __init__(self, manager, player):
         super().__init__()
         self.manager = manager
-        self.player_hand = self.manager.get_player_hand(player)
+        self.player_hand = self.manager.player_data[player]
         self.disabled_view = None
 
-        for card in self.player_hand:
-            current_turn_player = self.manager.game.turn_order[self.manager.game.turn_index]
-            uno_player = self.manager.game.player_data[player]
-            if len(self.manager.game.queued_cards) > 0:
-                #only allowed stackable cards
-                playable_cards = uno_player.get_stackable_playable_cards(
-                    self.manager.game.top_card,
-                    self.manager.game.preferences_variables
-                )
-            else:
-                #allowed any playable card
-                playable_cards = uno_player.get_playable_cards(
-                    self.manager.game.top_card,
-                    self.manager.game.preferences_variables
-                )
+        current_turn_player = self.manager.game.turn_order[self.manager.game.turn_index]
 
+        for card in self.player_hand:
             disabled = (
                 player != current_turn_player) or (
-                card not in playable_cards)
+                self.manager.can_play_card(card))
+            #basic safety to prevent more than 25 buttons being added and causing the whole bot
+            #to burn to death in the infernal flames of an api rejection
             if len(self.children) != 25:
                 self.add_item(CardButton(self.manager, card, disabled))
+
+class PreferencesQuitButton(discord.ui.Button):
+    """
+    Button class exclusively for the quit button in the uno preferences menu
+    """
+    def __init__(self, manager):
+        super().__init__(style=discord.ButtonStyle.red,label="Exit Settings")
+        self.manager = manager
+
+    async def callback(self, interaction):
+        self.manager.quick_log(f"{interaction.user} pressed {self.label}!")
+        await self.manager.close_preferences_menu(interaction)
 
 class CardButton(discord.ui.Button):
     """
