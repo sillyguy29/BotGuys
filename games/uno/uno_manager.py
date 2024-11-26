@@ -18,9 +18,8 @@ import games.uno.uno_views as Views
 #TODO show settings in join message
 #TODO single instance of preferences_gui view may cause issues with dynamic preference adding.
 #TODO setup rows for preferences menu to fix annoying ui element ordering
-#TODO implement effect stacking
-#TODO reimplement UNO from scratch to use new view system
-#TODO   write play_card, and next_turn methods
+#TODO debug uno
+#TODO add flavor text messages (e.g. '{player} was force fed {n} cards', 'deck is being reshuffled')
 
 class UnoManager(GameManager):
     '''
@@ -51,7 +50,36 @@ class UnoManager(GameManager):
         self.preferences_menu.add_ui_element(Views.PreferencesQuitButton(self))
         self.preferences_menu.add_menu_items()
 
-    async def add_player(self, interaction, init_player_data=UnoPlayer()):
+    async def bring_up_preferences_menu(self, interaction):
+        """
+        This is the uno manager call for preferences menu
+        If the user that called for the preferences menu is the one who called the
+        uno command and is currently in the game and game has not started
+        send an ephemeral message to the person who called for the preferences menu
+        which contains the submenu for selecting Uno Settings. Otherwise send a failure
+        message mentioning one of these requirements. The preferences menu will stay until
+        the user dismisses it or the game starts.
+        """
+        if  self.game.game_state != 4 and \
+            interaction.user in self.game.player_data and \
+            interaction.user in self.game.turn_order and \
+            interaction.user.id == self.game.user_id:
+            await interaction.response.send_message(
+                content="",
+                view=self.preferences_menu.get_view(),
+                silent=True,
+                ephemeral=True,
+                delete_after=60
+            )
+        else:
+            await interaction.response.send_message(
+                content="You have either not yet joined the game or you are not the creator of the game.",
+                silent=True,
+                ephemeral=True,
+                delete_after=5
+            )
+
+    async def add_player(self, interaction, init_player_data=UnoPlayer(), user=None):
         '''
         add_player: Called when a person presses the "Join" button.
         This method add the member to the game state's player_data as 

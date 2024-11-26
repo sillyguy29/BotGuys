@@ -43,6 +43,13 @@ class UnoGame(BaseGame):
         self.top_card = UnoCard("None", "")
         self.queued_cards = []
         #defines the variables for use and display
+        #this particular variable is a temporary list of the variables used by Uno
+        #It is later used as the constructing argument for a VariableStorage object
+        #which is stored in the BaseGame class's preferences_variables variable
+        #All variables are constructed with a name which is how their value will be found later.
+        #The initial value set here is the default value of this preference for any Uno game,
+        #but it can be changed by the user through the preferences menu constructed from the
+        #by variable storage in game.py
         preferences = [
             IntegerVariable("Drawn card show time", 5, range_min=0, range_max=20),
             IntegerVariable("Announcement lifetime", 0, range_min=0, range_max=20),
@@ -50,14 +57,14 @@ class UnoGame(BaseGame):
                 name="Stacking allowances",
                 default_value=[
                     "can_stack_effect_cards_on_effect_cards",
-                    "can_stack_plus_twos_on_effect_cards",
-                    "can_stack_plus_fours_on_effect_cards",
-                    "can_stack_effect_cards_on_plus_twos_cards",
-                    "can_stack_plus_twos_on_plus_twos_cards",
-                    "can_stack_plus_fours_on_plus_twos_cards",
-                    "can_stack_effect_cards_on_plus_fours_cards",
-                    "can_stack_plus_twos_on_plus_fours_cards",
-                    "can_stack_plus_fours_on_plus_fours_cards"
+                       "can_stack_plus_twos_on_effect_cards",
+                      "can_stack_plus_fours_on_effect_cards",
+                    "can_stack_effect_cards_on_plus_twos",
+                       "can_stack_plus_twos_on_plus_twos",
+                      "can_stack_plus_fours_on_plus_twos",
+                    "can_stack_effect_cards_on_plus_fours",
+                       "can_stack_plus_twos_on_plus_fours",
+                      "can_stack_plus_fours_on_plus_fours"
                 ],
                 options=[
                     OptionRepresentation(
@@ -78,7 +85,7 @@ class UnoGame(BaseGame):
                     ),
                     OptionRepresentation(
                         "Can stack plus twos on other plus twos",
-                        "can_stack_plus_twos_on_effect_cards"
+                        "can_stack_plus_twos_on_plus_twos"
                     ),
                     OptionRepresentation(
                         "Can stack plus fours on plus twos",
@@ -89,8 +96,8 @@ class UnoGame(BaseGame):
                         "can_stack_effect_cards_on_plus_fours"
                     ),
                     OptionRepresentation(
-                        "Can stack plus twos on other plus fours",
-                        "can_stack_plus_twos_on_effect_fours"
+                        "Can stack plus twos on plus fours",
+                        "can_stack_plus_twos_on_plus_fours"
                     ),
                     OptionRepresentation(
                         "Can stack plus fours on other plus fours",
@@ -103,14 +110,3 @@ class UnoGame(BaseGame):
             BooleanVariable("Reverse card repeats players turn",False),
         ]
         self.preferences_variables = VariableStorage(preferences)
-        """
-        self.drawn_card_show_time = 5
-        self.make_deck_time = 0
-        self.can_stack_effect_cards_on_effect_cards = True
-        self.can_stack_plus_fours_on_effect_cards = True
-        self.can_stack_effect_cards_on_plus_fours = True
-        self.can_stack_plus_fours_on_plus_fours = True
-        self.reverse_card_repeats_players_turn = False
-        self.can_callout_uno = False
-        self.only_play_plus_fours_without_matching_color = False
-        """

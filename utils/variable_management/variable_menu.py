@@ -9,10 +9,22 @@ class VariableMenu:
     """
     Class for creating and managing a menu that interfaces with a particular variable storage
     object.
+    Intended usage is to construct it with a variable storage with some variables in it.
+    Then use `self.add_ui_elements(element)`
+    to add whatever elements other than preferences you need to it.
+    (i.e. a quit button)
+    Then call `self.add_menu_items()`
+    After that whenever a user brings up the preferences menu just pass
+    `self.preferences_menu.get_view()`
+    as the view of the message you want to have the preferences menu.
     """
     def __init__(self, variable_storage, variable_order=None):
-        self.variable_storage = VariableStorage(None) if variable_storage is None else variable_storage 
-        
+        self.variable_storage = (
+            VariableStorage(None)
+            if variable_storage is None else
+            variable_storage
+        )
+
         if variable_order is None:
             self.variable_layout = {
                 key: {"order": index, "index": None}
@@ -36,7 +48,7 @@ class VariableMenu:
     def add_ui_element(self, element):
         """
         Manually add a ui element, useful in the case where you want a button to do something that
-        is not just modifying the value of a variable.
+        is not just modifying the value of a variable. In particular, add a quit button.
         """
         self.menu_view.add_item(element)
 
@@ -46,12 +58,14 @@ class VariableMenu:
         that items position within the view for future use
         """
         self.variable_layout[key]["index"]=len(self.menu_view.children)
-        self.menu_view.add_item(self.variable_storage.get_variable(key).create_placeholder_ui_element())
+        self.menu_view.add_item(
+            self.variable_storage.get_variable(key).create_placeholder_ui_element()
+        )
 
     def generate_menu_item_contents(self, key):
         """
-        generates the menu ui element for a given variable in preferences and inserts
-        it into the view index it was assigned to
+        generates the menu ui element contents for a given variable in preference's inserts
+        the contents into whatever value is at that preference's expected location
         """
         element = self.menu_view.children[self.variable_layout[key]["index"]]
         self.variable_storage.get_variable(key).assign_ui_element_contents(element, self.menu_view)

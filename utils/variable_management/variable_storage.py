@@ -8,6 +8,7 @@ class VariableStorage:
     """
     def __init__(self, variables=None):
         self.variables = {}
+        #put the passed list of variables into a dictionary by their name
         for variable in [] if variables is None else variables:
             self.variables[variable.name] = variable
 
@@ -22,7 +23,7 @@ class VariableStorage:
         Setter method for setting the value of avariable in the storage by its name
         """
         self.variables[name].set_value(value)
-    
+
     def get_variable(self, name):
         """
         Getter method for directly accessing a variable in storage by its name
